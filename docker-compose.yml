@@ -331,6 +331,10 @@ services:
       # do it against the deployed box, not here.
       MAIL_SERVER: mailpit
       MAIL_PORT: 1025
+      MAIL_USE_TLS: "false"
+      # mailpit takes no login; a relay's credentials from .env would make the client try one.
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000
@@ -423,6 +427,10 @@ services:
       # do it against the deployed box, not here.
       MAIL_SERVER: mailpit
       MAIL_PORT: 1025
+      MAIL_USE_TLS: "false"
+      # mailpit takes no login; a relay's credentials from .env would make the client try one.
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000
@@ -539,6 +547,10 @@ services:
       # do it against the deployed box, not here.
       MAIL_SERVER: mailpit
       MAIL_PORT: 1025
+      MAIL_USE_TLS: "false"
+      # mailpit takes no login; a relay's credentials from .env would make the client try one.
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       CHECKPOINT_ALERT_HOURS: ${CHECKPOINT_ALERT_HOURS:-6}
@@ -618,6 +630,10 @@ services:
       # do it against the deployed box, not here.
       MAIL_SERVER: mailpit
       MAIL_PORT: 1025
+      MAIL_USE_TLS: "false"
+      # mailpit takes no login; a relay's credentials from .env would make the client try one.
+      MAIL_USERNAME: ""
+      MAIL_PASSWORD: ""
       MAIL_DEFAULT_SENDER: ${MAIL_DEFAULT_SENDER:-noreply@kayakplanner.app}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STORAGE_ENDPOINT: http://minio:9000

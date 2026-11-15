@@ -19,6 +19,7 @@ import {
   logout,
   logoutEverywhere,
   forgotPassword,
+  resendVerification,
   resetPassword,
   refreshSession,
   cancelDeletion,
@@ -716,5 +717,59 @@ describe("verifyAccount", () => {
 
     expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
     expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+})
+
+describe("resendVerification", () => {
+  const fields = { mail: "kayaker@example.com" }
+
+  it("POSTs only the address to the backend", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await resendVerification(null, formData(fields))
+
+    expect(result).toEqual({ success: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain("/auth/resend-verification")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({ mail: "kayaker@example.com" })
+  })
+
+  it("rejects a malformed address without calling the server", async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await resendVerification(null, formData({ mail: "nope" }))
+
+    expect(result).toEqual({ success: false, error: "Enter a valid email address." })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("explains a rate limit (429) rather than calling it a server fault", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429 }))
+
+    const result = await resendVerification(null, formData(fields))
+
+    expect(result).toEqual({
+      success: false,
+      error: "Too many attempts. Please try again in a while.",
+    })
+  })
+
+  it("returns a generic failure for any other non-ok response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 500 }))
+
+    const result = await resendVerification(null, formData(fields))
+
+    expect(result).toEqual({ success: false, error: "Something went wrong. Please try again." })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+
+    const result = await resendVerification(null, formData(fields))
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
   })
 })

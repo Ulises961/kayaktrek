@@ -1,5 +1,4 @@
 import math
-import re
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from uuid import UUID
@@ -25,14 +24,12 @@ from Models.auth_token import AuthToken, AuthTokenType
 from Services.auth_service import AuthService
 from Services.block_service import BlockService
 from Services.session_service import SessionService
+from Services.Utils.mail_address import is_valid_mail, normalize_mail
 
 logger = logging.getLogger(__name__)
 
 
 class UserService:
-    # Same pattern UserSchema.validate_mail uses — kept in sync deliberately.
-    _MAIL_PATTERN = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-
     _MUTABLE_FIELDS = frozenset({
         "username", "name", "surname", "phone",
         "vessel_make", "vessel_model", "vessel_length_cm",
@@ -566,7 +563,8 @@ class UserService:
             ValueError: If new_mail is malformed or matches the current address
         """
         user = UserService.get_user_by_id(id)
-        if len(new_mail) > 255 or not UserService._MAIL_PATTERN.match(new_mail):
+        new_mail = normalize_mail(new_mail)
+        if not is_valid_mail(new_mail):
             raise ValueError("Invalid email format")
         if new_mail == user.mail:
             raise ValueError("New email must be different from the current address")
@@ -713,7 +711,7 @@ class UserService:
         given email, or None if the email is unknown or has no pending deletion.
         Returning None (rather than raising) prevents account enumeration.
         """
-        user = db.session.query(User).filter_by(mail=mail_addr).first()
+        user = db.session.query(User).filter_by(mail=normalize_mail(mail_addr)).first()
         if not user or not user.deletion_requested_at:
             return None
 

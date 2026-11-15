@@ -245,6 +245,7 @@ notification form are both account/credential steps, done once by a human in the
    |---|---|---|---|
    | App — public | HTTP | `https://api.<domain>/api/v1/health` | The path a real user takes: DNS → Cloudflare → tunnel → nginx → app. A local-only check can't see the tunnel drop. **`api.`, not the apex** — corrected 2026-08-31, this line said `https://<domain>/…` and the apex proxies to the frontend, so it 404s. A monitor built from it sits permanently red and gets dismissed as broken. Verify with `curl` before saving any monitor: **since M28**, the apex only 301-redirects to `app.` and `api.` still answers `/api/v1/health` directly. |
    | App — local | HTTP | `http://127.0.0.1:5000/api/v1/health` | If only the public one goes red, it's the tunnel, not the app — this pair is the diagnosis. |
+   | Mail — public | HTTP | `https://api.<domain>/api/v1/health/mail` | Goes red (503) for an hour after any transactional mail failed to send — a revoked or expired `BREVO_API_KEY`, an unvalidated sender, a Brevo outage. The send path swallows its own errors on purpose (a no-oracle endpoint answers the same whether or not mail went out), so without this a user who never got a verification or reset mail is the only alarm. **Not part of `/health`**: that one gates the compose healthcheck, and a mail provider outage must not make the orchestrator think the backend is down. A 200 whose body says `"status": "unknown"` means the failure record (Redis) could not be read — alert on the status code, and look at Redis if it persists. The detail is in the backend logs as `email_send_failed` (template, error type, provider status code, traceback — never the recipient). |
    | Marketing — public | HTTP | `https://www.<domain>/` | Static page, no app behind it — but it's still served through the same tunnel/nginx path, so it can break independently of the app (M28). |
    | RabbitMQ | TCP | `127.0.0.1:5672` | ADR-034's original reason for this container: a silent RabbitMQ death would take the missed-checkpoint shore-contact alert down with it, invisibly. |
    | ~~Backup heartbeat~~ | Push | — | **Declined 2026-08-31.** `BACKUP_HEARTBEAT_URL` stays unset. A *push* monitor needs the droplet to reach Kuma, and Kuma binds to `127.0.0.1:3001` here and is deliberately never tunnelled — so this would need either a second service or a path-scoped ingress rule on this box. Disproportionate, because the heartbeat's rationale was the *home box's* suspend behaviour (`backup-db.sh`'s comment: "the box suspends, so a missed window produces no output anywhere") and the droplet does not suspend. Accepted gap: a backup job that stops running is not alerted on. |
@@ -641,6 +642,35 @@ add a periodic `rclone` copy R2 → B2; R2 charges no egress, so it is free to r
 
 **`.env` itself** is not backed up either, and holds `JWT_SECRET_KEY` — losing it logs out
 every user. It belongs in your password manager.
+
+## Correcting a mistyped signup address
+
+Someone who typed their email wrong at signup never receives the verification link and cannot
+fix it themselves — sign-in only ever says "invalid credentials" (saying "not verified" would leak
+which addresses are registered). The resend page tells them to write to `support@`; the fix is
+admin-only, `POST /api/v1/user/correct-unverified-mail`, which moves the account to the right
+address, voids its old verification links and mails a new one there.
+
+Ask the person for their **username** and the address they meant. An administrator (an account
+with `users.admin = true`, set in the database) does it from **Admin** in the account menu,
+`/admin`: username, correct address, "Move account and send link". The page 404s for anyone else.
+
+The same call without the page, for when the web app is down or you are on the box:
+
+```bash
+read -rsp "admin password: " ADMIN_PWD; echo
+TOKEN=$(curl -s -X POST https://api.<domain>/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d "{\"mail\":\"<admin address>\",\"pwd\":\"$ADMIN_PWD\"}" | jq -r .access_token)
+curl -s -X POST https://api.<domain>/api/v1/user/correct-unverified-mail \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"username":"<their username>","newMail":"<the right address>"}'
+```
+
+It answers plainly because the caller is an admin: 404 no such username, 409 the account is
+already verified (its address is then changed from their own profile, not here) or the address
+belongs to another account, 400 a malformed address. A 200 means the mail was handed to the
+provider; if it still does not arrive, check the Mail monitor above.
 
 ## Closing registration in a hurry
 

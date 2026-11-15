@@ -1,9 +1,9 @@
 import { ChartHeaderBar } from "@/components/common/chart-header"
 import { PageHeading } from "@/components/common/page-heading"
+import { SUPPORT_MAIL } from "@/lib/support"
 import packageJson from "@/package.json"
 
 const GITHUB_URL = "https://github.com/Ulises961"
-const SUPPORT_MAIL = "support@kayaktrek.app"
 
 export const metadata = {
   title: "About",

@@ -148,8 +148,8 @@ class TestResendVerification:
         r = client.get(f"/api/v1/auth/verify?token={old_raw}")
         assert r.status_code == 400
 
-    def test_resend_already_active_returns_400(self, app, client):
-        """Resend for an already-active account returns 400."""
+    def test_resend_already_active_answers_like_any_other_address(self, app, client):
+        """No oracle: an active account gets the same 200, and no mail."""
         d = _register(client)
         user = User.query.filter_by(mail=d["mail"]).first()
         assert user is not None
@@ -157,11 +157,11 @@ class TestResendVerification:
         db.session.commit()
 
         r = client.post("/api/v1/auth/resend-verification", json={"mail": d["mail"]})
-        assert r.status_code == 400
+        assert r.status_code == 200
 
-    def test_resend_unknown_mail_returns_404(self, client):
+    def test_resend_unknown_mail_answers_like_any_other_address(self, client):
         r = client.post("/api/v1/auth/resend-verification", json={"mail": "nobody@example.com"})
-        assert r.status_code == 404
+        assert r.status_code == 200
 
     def test_resend_missing_mail_returns_400(self, client):
         r = client.post("/api/v1/auth/resend-verification", json={})

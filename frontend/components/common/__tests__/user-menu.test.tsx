@@ -54,6 +54,24 @@ describe("UserMenu", () => {
     )
   })
 
+  it("offers the admin page to an administrator", async () => {
+    render(<UserMenu account={{ ...account, isAdmin: true }} />)
+    await openMenu()
+
+    expect((await screen.findByRole("menuitem", { name: /admin/i })).closest("a")).toHaveAttribute(
+      "href",
+      "/admin",
+    )
+  })
+
+  it("does not mention the admin page to anyone else", async () => {
+    render(<UserMenu account={account} />)
+    await openMenu()
+    await screen.findByRole("menuitem", { name: /settings/i })
+
+    expect(screen.queryByRole("menuitem", { name: /admin/i })).not.toBeInTheDocument()
+  })
+
   it("signs out from the menu", async () => {
     render(<UserMenu account={account} />)
     await openMenu()

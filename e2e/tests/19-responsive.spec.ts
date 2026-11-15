@@ -76,7 +76,14 @@ const WIDTHS = [320, 640] as const
 
 // Static routes only — anything needing a seeded trip/itinerary id belongs in the
 // phase that fixes that surface, where the fixture already exists.
-const ANONYMOUS_ROUTES = ["/", "/login", "/register", "/terms", "/forgot-password"]
+const ANONYMOUS_ROUTES = [
+  "/",
+  "/login",
+  "/register",
+  "/terms",
+  "/forgot-password",
+  "/resend-verification",
+]
 
 const AUTHENTICATED_ROUTES = [
   "/dashboard",

@@ -13,7 +13,7 @@ vi.mock("@/lib/crypto/medical", () => ({
 }))
 
 async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText(/email/i), "a@b.com")
+  await user.type(screen.getByLabelText(/^email$/i), "a@b.com")
   await user.type(screen.getByLabelText(/username/i), "kayaker")
   await user.type(screen.getByLabelText(/^password$/i), "Expedition#24")
 }
@@ -70,6 +70,11 @@ describe("RegisterForm", () => {
     await waitFor(() => expect(registerAction).toHaveBeenCalled())
     const [, formData] = vi.mocked(registerAction).mock.calls[0]
     expect((formData as FormData).get("inviteCode")).toBe("beta-2026")
+  })
+
+  it("asks for the email address once", () => {
+    render(<RegisterForm inviteCodeRequired={false} />)
+    expect(screen.getAllByLabelText(/email/i)).toHaveLength(1)
   })
 
   it("disables the submit button for the whole submit, including keypair generation", async () => {

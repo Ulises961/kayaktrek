@@ -6,6 +6,7 @@ import { login } from "@/lib/auth/actions"
 import { backfillKeypair } from "@/lib/crypto/keypair-backfill"
 
 const replace = vi.fn()
+let searchParams = new URLSearchParams()
 
 vi.mock("@/lib/auth/actions", () => ({
   login: vi.fn(),
@@ -15,7 +16,7 @@ vi.mock("@/lib/crypto/keypair-backfill", () => ({
 }))
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => searchParams,
 }))
 
 async function signIn(user: ReturnType<typeof userEvent.setup>) {
@@ -27,6 +28,29 @@ async function signIn(user: ReturnType<typeof userEvent.setup>) {
 describe("LoginForm", () => {
   afterEach(() => {
     vi.clearAllMocks()
+    searchParams = new URLSearchParams()
+  })
+
+  describe("a verification email that never arrived", () => {
+    // A mistyped address at signup leaves the account unverified and the link in someone
+    // else's inbox. Sign-in reports only "invalid credentials", so this is the way back.
+    it("always offers the resend page beneath the form", () => {
+      render(<LoginForm />)
+
+      expect(
+        screen.getByRole("link", { name: /didn't get your verification email/i }),
+      ).toHaveAttribute("href", "/resend-verification")
+    })
+
+    it("leaves the post-registration notice as plain text, so the footer link is the one way in", () => {
+      searchParams = new URLSearchParams("registered=1")
+      render(<LoginForm />)
+
+      expect(screen.getByText(/check your email to verify/i)).toBeInTheDocument()
+      expect(
+        screen.getAllByRole("link", { name: /verification email|email address/i }),
+      ).toHaveLength(1)
+    })
   })
 
   it("shows the server's error rather than navigating", async () => {

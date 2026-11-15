@@ -89,6 +89,33 @@ def test_config_module_accepts_a_frontend_url_with_an_http_origin(good_value):
     assert result.returncode == 0, result.stderr
 
 
+# ---------------------------------------------------------------------------
+# MAIL_USE_TLS — real relays need STARTTLS; the local mailpit sink has none, so the dev
+# stack switches it off. Unset must stay on, or a production box would send in the clear.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("value, expected", [
+    (None, "True"),
+    ("", "True"),
+    ("true", "True"),
+    ("1", "True"),
+    ("false", "False"),
+    ("FALSE", "False"),
+    ("0", "False"),
+    ("no", "False"),
+    ("off", "False"),
+])
+def test_config_mail_use_tls_is_on_unless_switched_off(value, expected):
+    env = _base_env()
+    env.pop("MAIL_USE_TLS", None)
+    if value is not None:
+        env["MAIL_USE_TLS"] = value
+    result = _import_config_with_env(env, then="print(Api.config.Config.MAIL_USE_TLS)")
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == expected
+
+
 def test_config_frontend_url_has_no_trailing_slash():
     """Links are built as `{FRONTEND_URL}/reset-password`, so a trailing slash in the
     configured value would double it."""
