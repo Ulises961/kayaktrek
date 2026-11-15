@@ -41,6 +41,27 @@ export default defineConfig({
     // (lib/__tests__/features-parked.test.tsx), which mocks lib/features rather than
     // relying on this.
     env: { NEXT_PUBLIC_MEDICAL_NOTES: "true" },
+    // Only measured under `pnpm test:coverage`, which CI runs and uploads to Codecov. The
+    // denominator is the code the app ships: shadcn primitives (`components/ui`, never edited
+    // by hand) and the dev-only design showcase are left out, so the number says how much of
+    // what we wrote is exercised rather than how much of a vendored library is.
+    coverage: {
+      provider: "v8",
+      reporter: ["lcov", "text-summary"],
+      include: [
+        "app/**/*.{ts,tsx}",
+        "components/**/*.{ts,tsx}",
+        "hooks/**/*.{ts,tsx}",
+        "lib/**/*.{ts,tsx}",
+      ],
+      exclude: [
+        "**/__tests__/**",
+        "**/__mocks__/**",
+        "**/*.d.ts",
+        "components/ui/**",
+        "app/**/design/**",
+      ],
+    },
   },
   resolve: {
     alias: {
