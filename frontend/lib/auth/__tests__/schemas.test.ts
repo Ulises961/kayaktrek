@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest"
 import {
   LoginSchema,
   RegisterSchema,
+  RegisterFormSchema,
+  CorrectUnverifiedMailSchema,
   PASSWORD_RULES,
   ForgotPasswordSchema,
   ResetPasswordSchema,
@@ -213,5 +215,93 @@ describe("ResetPasswordSchema", () => {
     it("accepts when confirmPassword matches password exactly", () => {
       expect(ResetPasswordSchema.safeParse(valid).success).toBe(true)
     })
+  })
+})
+
+describe("RegisterFormSchema", () => {
+  const valid = {
+    mail: "user@example.com",
+    confirmMail: "user@example.com",
+    username: "kayaker_42",
+    password: STRONG_PASSWORD,
+  }
+
+  it("accepts matching addresses", () => {
+    expect(RegisterFormSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it("accepts addresses that differ only by case or surrounding space", () => {
+    expect(
+      RegisterFormSchema.safeParse({ ...valid, confirmMail: " User@Example.COM " }).success,
+    ).toBe(true)
+  })
+
+  it("rejects a mistyped confirmation and puts the error on the confirm field", () => {
+    const result = RegisterFormSchema.safeParse({ ...valid, confirmMail: "usr@example.com" })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["confirmMail"])
+      expect(result.error.issues[0].message).toBe("The email addresses do not match.")
+    }
+  })
+
+  it("rejects a missing confirmation", () => {
+    expect(RegisterFormSchema.safeParse({ ...valid, confirmMail: "" }).success).toBe(false)
+  })
+
+  it("still enforces everything RegisterSchema does", () => {
+    expect(RegisterFormSchema.safeParse({ ...valid, password: "weak" }).success).toBe(false)
+  })
+})
+
+describe("CorrectUnverifiedMailSchema", () => {
+  const valid = { mail: "typo@example.com", password: "anything" }
+
+  it("accepts just the credentials, which means resend to the same address", () => {
+    expect(CorrectUnverifiedMailSchema.safeParse(valid).success).toBe(true)
+  })
+
+  it("treats blank new-address fields as not provided", () => {
+    expect(
+      CorrectUnverifiedMailSchema.safeParse({ ...valid, newMail: "", confirmNewMail: "" }).success,
+    ).toBe(true)
+  })
+
+  it("accepts a new address that is confirmed", () => {
+    expect(
+      CorrectUnverifiedMailSchema.safeParse({
+        ...valid,
+        newMail: "right@example.com",
+        confirmNewMail: "Right@example.com",
+      }).success,
+    ).toBe(true)
+  })
+
+  it("rejects an unconfirmed new address, on the confirm field", () => {
+    const result = CorrectUnverifiedMailSchema.safeParse({
+      ...valid,
+      newMail: "right@example.com",
+      confirmNewMail: "",
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues[0].path).toEqual(["confirmNewMail"])
+      expect(result.error.issues[0].message).toBe("The email addresses do not match.")
+    }
+  })
+
+  it("rejects a malformed new address, on the new-address field", () => {
+    const result = CorrectUnverifiedMailSchema.safeParse({
+      ...valid,
+      newMail: "not-an-address",
+      confirmNewMail: "not-an-address",
+    })
+    expect(result.success).toBe(false)
+    if (!result.success) expect(result.error.issues[0].path).toEqual(["newMail"])
+  })
+
+  it("requires the password and a valid current address", () => {
+    expect(CorrectUnverifiedMailSchema.safeParse({ ...valid, password: "" }).success).toBe(false)
+    expect(CorrectUnverifiedMailSchema.safeParse({ ...valid, mail: "nope" }).success).toBe(false)
   })
 })

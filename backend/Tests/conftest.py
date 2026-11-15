@@ -240,6 +240,58 @@ def trip_change_redis():
         yield fake
 
 
+class FakeMailFailureRedis:
+    """The mail send-failure record (`Services/mail_service.py`), as far as it uses Redis: one
+    sorted set. Autouse below, so a test that makes a send fail never writes into a developer's
+    real Redis, and none depends on one being reachable (CI runs no Redis service)."""
+
+    def __init__(self):
+        self.sets: dict[str, dict[str, float]] = {}
+        self.ttls: dict[str, int] = {}
+        self.down = False
+
+    def pipeline(self):
+        return FakeMailFailurePipeline(self)
+
+    def zcount(self, key, minimum, maximum):
+        assert maximum == "+inf"
+        if self.down:
+            raise ConnectionError("redis down")
+        return sum(1 for score in self.sets.get(key, {}).values() if score >= minimum)
+
+
+class FakeMailFailurePipeline:
+    def __init__(self, redis_fake):
+        self.redis_fake = redis_fake
+        self.operations = []
+
+    def zadd(self, key, mapping):
+        self.operations.append(lambda: self.redis_fake.sets.setdefault(key, {}).update(mapping))
+
+    def zremrangebyscore(self, key, minimum, maximum):
+        def trim():
+            members = self.redis_fake.sets.setdefault(key, {})
+            for member in [m for m, score in members.items() if minimum <= score <= maximum]:
+                del members[member]
+        self.operations.append(trim)
+
+    def expire(self, key, seconds):
+        self.operations.append(lambda: self.redis_fake.ttls.update({key: seconds}))
+
+    def execute(self):
+        if self.redis_fake.down:
+            raise ConnectionError("redis down")
+        for operation in self.operations:
+            operation()
+
+
+@pytest.fixture(autouse=True)
+def mail_failure_redis():
+    fake = FakeMailFailureRedis()
+    with patch("Services.mail_service.monitoring_redis", return_value=fake):
+        yield fake
+
+
 @pytest.fixture(scope='session')
 def client(app):
     """Test client for making requests."""

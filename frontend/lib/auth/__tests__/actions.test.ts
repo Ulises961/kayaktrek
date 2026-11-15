@@ -19,6 +19,7 @@ import {
   logout,
   logoutEverywhere,
   forgotPassword,
+  correctUnverifiedMail,
   resetPassword,
   refreshSession,
   cancelDeletion,
@@ -716,5 +717,117 @@ describe("verifyAccount", () => {
 
     expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
     expect(mockCookieStore.set).not.toHaveBeenCalled()
+  })
+})
+
+describe("correctUnverifiedMail", () => {
+  const fields = { mail: "typo@example.com", password: "Expedition#24" }
+
+  it("POSTs the credentials and the corrected address to the backend", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await correctUnverifiedMail(
+      null,
+      formData({ ...fields, newMail: "right@example.com", confirmNewMail: "right@example.com" }),
+    )
+
+    expect(result).toEqual({ success: true })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toContain("/auth/correct-unverified-mail")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(init.body)).toEqual({
+      mail: "typo@example.com",
+      pwd: "Expedition#24",
+      newMail: "right@example.com",
+    })
+  })
+
+  it("omits newMail when the field was left blank, which means resend to the same address", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 })
+    vi.stubGlobal("fetch", fetchMock)
+
+    await correctUnverifiedMail(null, formData({ ...fields, newMail: "", confirmNewMail: "" }))
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      mail: "typo@example.com",
+      pwd: "Expedition#24",
+    })
+  })
+
+  it("rejects an unconfirmed new address without calling the server", async () => {
+    const fetchMock = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+
+    const result = await correctUnverifiedMail(
+      null,
+      formData({ ...fields, newMail: "right@example.com", confirmNewMail: "rihgt@example.com" }),
+    )
+
+    expect(result).toEqual({ success: false, error: "The email addresses do not match." })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it("reports a wrong email or password (401) as such", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+
+    const result = await correctUnverifiedMail(null, formData(fields))
+
+    expect(result).toEqual({ success: false, error: "Wrong email or password." })
+  })
+
+  it("tells someone whose account is already verified to sign in", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ code: "already_verified" }),
+      }),
+    )
+
+    const result = await correctUnverifiedMail(null, formData(fields))
+
+    expect(result).toEqual({
+      success: false,
+      error: "This account is already verified — you can sign in.",
+      code: "already_verified",
+    })
+  })
+
+  it("explains a rate limit (429) rather than calling it a server fault", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status: 429 }))
+
+    const result = await correctUnverifiedMail(null, formData(fields))
+
+    expect(result).toEqual({
+      success: false,
+      error: "Too many attempts. Please try again in a while.",
+    })
+  })
+
+  it("returns a generic failure for any other non-ok response, even one with no JSON body", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => {
+          throw new Error("no body")
+        },
+      }),
+    )
+
+    const result = await correctUnverifiedMail(null, formData(fields))
+
+    expect(result).toEqual({ success: false, error: "Something went wrong. Please try again." })
+  })
+
+  it("returns an error when the server is unreachable", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network error")))
+
+    const result = await correctUnverifiedMail(null, formData(fields))
+
+    expect(result).toEqual({ success: false, error: expect.stringContaining("server") })
   })
 })

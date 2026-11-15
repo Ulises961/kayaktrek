@@ -28,6 +28,21 @@ export const RegisterSchema = z.object({
     .regex(/[!@#$%^&*(),.?":{}|<>]/, "Password must contain at least one special character."),
 })
 
+const MAIL_MISMATCH = "The email addresses do not match."
+
+// The backend compares addresses without case or surrounding space, so the confirmation does too.
+function sameAddress(first: string, second: string): boolean {
+  return first.trim().toLowerCase() === second.trim().toLowerCase()
+}
+
+// What the register form validates. `confirmMail` never leaves the browser — it exists to catch
+// a typo before it strands the account behind a verification mail that goes to the wrong place —
+// so the server action keeps parsing the narrower RegisterSchema.
+export const RegisterFormSchema = RegisterSchema.extend({ confirmMail: z.string() }).refine(
+  (data) => sameAddress(data.mail, data.confirmMail),
+  { message: MAIL_MISMATCH, path: ["confirmMail"] },
+)
+
 // The always-visible signup checklist mirrors RegisterSchema's password regexes
 // verbatim (M12 §F) — change them together or the live checklist lies.
 // Special-character set must match the backend's validate_pwd exactly
@@ -44,6 +59,32 @@ export const PASSWORD_RULES: { label: string; test: (value: string) => boolean }
 export const ForgotPasswordSchema = z.object({
   mail: z.string().email("Enter a valid email address."),
 })
+
+// Fixing the address of an account that was never verified. The password is the proof of
+// ownership (the mailbox is the part that is wrong). A blank `newMail` means "resend to the
+// address I gave", so it and its confirmation are only validated once something is typed.
+export const CorrectUnverifiedMailSchema = z
+  .object({
+    mail: z.string().email("Enter a valid email address."),
+    password: z.string().min(1, "Password is required."),
+    newMail: z.string().optional(),
+    confirmNewMail: z.string().optional(),
+  })
+  .superRefine((data, context) => {
+    const newMail = data.newMail?.trim()
+    if (!newMail) return
+    if (!z.string().email().safeParse(newMail).success) {
+      context.addIssue({
+        code: "custom",
+        message: "Enter a valid email address.",
+        path: ["newMail"],
+      })
+      return
+    }
+    if (!sameAddress(newMail, data.confirmNewMail ?? "")) {
+      context.addIssue({ code: "custom", message: MAIL_MISMATCH, path: ["confirmNewMail"] })
+    }
+  })
 
 export const ResetPasswordSchema = z
   .object({
@@ -65,5 +106,7 @@ export const ResetPasswordSchema = z
 
 export type LoginInput = z.infer<typeof LoginSchema>
 export type RegisterInput = z.infer<typeof RegisterSchema>
+export type RegisterFormInput = z.infer<typeof RegisterFormSchema>
+export type CorrectUnverifiedMailInput = z.infer<typeof CorrectUnverifiedMailSchema>
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>

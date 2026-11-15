@@ -10,11 +10,12 @@ from sqlalchemy.exc import NoResultFound
 
 from Api.limiter import limiter
 from Schemas.user_schema import UserSchema
-from Services.auth_service import AuthService
+from Services.auth_service import AccountAlreadyVerifiedError, AuthService
 from Services.mail_service import send_template_email
 from Services.session_service import SessionService
 from Services.user_service import UserService
 from Services.Utils.client_identity import resolve_device_label, resolve_location_label
+from Services.Utils.mail_address import normalize_mail
 from Services.Middleware.auth_middleware import JWTService
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ api = Blueprint("auth", __name__)
 def _resend_key() -> str:
     data = request.get_json(silent=True) or {}
     mail = data.get("mail")
-    return mail if mail else get_remote_address()
+    return normalize_mail(mail) if isinstance(mail, str) and mail else get_remote_address()
 
 
 @api.route("/api/v1/auth/login", methods=["POST"])
@@ -391,6 +392,68 @@ def resend_verification() -> ResponseReturnValue:
         abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
     except ValueError as e:
         abort(HTTPStatus.BAD_REQUEST, description=str(e))
+
+
+@api.route("/api/v1/auth/correct-unverified-mail", methods=["POST"])
+@limiter.limit("5 per hour", key_func=_resend_key)
+@limiter.limit("20 per hour", key_func=get_remote_address)
+def correct_unverified_mail() -> ResponseReturnValue:
+    """
+    ---
+    post:
+      summary: Fix the address of an unverified account and resend the verification email
+      description: >
+        For someone who mistyped their email at registration and so never received the
+        verification link. Proves ownership with the password, since the mailbox is the part
+        that is wrong. `newMail` omitted or equal to `mail` just resends to the current
+        address. If `newMail` already belongs to another account the response is the same
+        200 and that account's owner is mailed instead, so this cannot be used to probe for
+        registered addresses.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mail, pwd]
+              properties:
+                mail:
+                  type: string
+                  format: email
+                  description: The address the account was registered with.
+                pwd:
+                  type: string
+                  format: password
+                newMail:
+                  type: string
+                  format: email
+      responses:
+        200:
+          description: A verification email was sent, if the address could be used
+        400:
+          description: Malformed address, or the account is already verified
+        401:
+          description: No such account or wrong password
+    """
+    data = request.get_json(silent=True) or {}
+    mail, password, new_mail = data.get("mail"), data.get("pwd"), data.get("newMail")
+    if not isinstance(mail, str) or not isinstance(password, str) or not mail or not password:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing mail or password")
+    if new_mail is not None and not isinstance(new_mail, str):
+        abort(HTTPStatus.BAD_REQUEST, description="Invalid email format")
+    try:
+        AuthService.correct_unverified_mail(mail, password, new_mail)
+    except PermissionError:
+        return jsonify({"status": "fail", "message": "Invalid credentials"}), HTTPStatus.UNAUTHORIZED
+    except AccountAlreadyVerifiedError:
+        return jsonify({
+            "status": "fail",
+            "code": "already_verified",
+            "message": "This account is already verified.",
+        }), HTTPStatus.BAD_REQUEST
+    return jsonify({
+        "status": "success",
+        "message": "If that address can be used, a verification email is on its way.",
+    }), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])

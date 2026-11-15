@@ -10,6 +10,7 @@ import {
   LoginSchema,
   RegisterSchema,
   ForgotPasswordSchema,
+  CorrectUnverifiedMailSchema,
   ResetPasswordSchema,
 } from "@/lib/auth/schemas"
 
@@ -231,6 +232,56 @@ export async function forgotPassword(
   }
 
   return { success: true }
+}
+
+/**
+ * Fix the address of an account that never got its verification mail (it was mistyped at
+ * signup) and send the link to the right one. Proves ownership with the password, since
+ * the mailbox is the part that is wrong. A blank `newMail` resends to the current address.
+ */
+export async function correctUnverifiedMail(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
+  const parsed = CorrectUnverifiedMailSchema.safeParse({
+    mail: formData.get("mail"),
+    password: formData.get("password"),
+    newMail: formData.get("newMail") ?? undefined,
+    confirmNewMail: formData.get("confirmNewMail") ?? undefined,
+  })
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: parsed.error.issues[0]?.message ?? "Please fix the errors below.",
+    }
+  }
+
+  const { mail, password, newMail } = parsed.data
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/correct-unverified-mail`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mail, pwd: password, newMail: newMail?.trim() || undefined }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  if (res.ok) return { success: true }
+  if (res.status === 401) return { success: false, error: "Wrong email or password." }
+  if (res.status === 429) {
+    return { success: false, error: "Too many attempts. Please try again in a while." }
+  }
+  const body = await res.json().catch(() => ({}))
+  if (body?.code === "already_verified") {
+    return {
+      success: false,
+      error: "This account is already verified — you can sign in.",
+      code: "already_verified",
+    }
+  }
+  return { success: false, error: "Something went wrong. Please try again." }
 }
 
 export async function resetPassword(
