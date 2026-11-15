@@ -451,7 +451,9 @@ class ItineraryService:
             .group_by(Place.itinerary_id)
             .all()
         )
-        return {itinerary_id: count for itinerary_id, count in rows}
+        # `Place.itinerary_id` is nullable (a global place has none); the IN filter above
+        # already excludes those, so the guard only narrows the type.
+        return {itinerary_id: count for itinerary_id, count in rows if itinerary_id is not None}
 
     @staticmethod
     def _authors_for_sources(source_ids: Set[UUID]) -> Dict[UUID, dict]:

@@ -30,7 +30,7 @@ from kombu.transport.pyamqp import Transport as _AMQPTransport
 # basic_qos with global_=True (channel-level QoS). RabbitMQ 3.12 deprecated
 # that flag. Returning True here makes Celery use global_=False (per-consumer
 # QoS), which RabbitMQ >= 3.3 implements correctly.
-_AMQPTransport.qos_semantics_matches_spec = lambda self, connection: True
+_AMQPTransport.qos_semantics_matches_spec = lambda self, connection: True  # type: ignore[method-assign]  # kombu types it as a method; replacing it on the class is the point
 
 load_dotenv()
 
