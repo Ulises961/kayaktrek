@@ -40,7 +40,7 @@ dependencies = [
     "global-land-mask>=1.0.0",
     "gevent",
     "psycogreen",
-    "timezonefinder>=8.2.5",
+    "timezonefinder>=9.2.0",
     "logfire[celery,flask,requests,sqlalchemy]>=5.4.0",
     "apispec>=6.10.1",
     "apispec-webframeworks>=1.2.0",
