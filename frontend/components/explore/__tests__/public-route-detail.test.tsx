@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 import { PublicRouteDetail } from "../public-route-detail"
 import { DISTANCE_UNIT, formatDistance } from "@/lib/itinerary/distance"
 import type { RouteData } from "@/lib/itinerary/public-routes"
@@ -105,7 +106,7 @@ describe("PublicRouteDetail", () => {
     expect(screen.getByText("summer")).toBeInTheDocument()
   })
 
-  it("renders the day breakdown derived from the route's own day segments", () => {
+  it("renders the day breakdown derived from the route's own day segments, folded until opened", async () => {
     render(
       <PublicRouteDetail
         route={route()}
@@ -114,7 +115,41 @@ describe("PublicRouteDetail", () => {
         backLabel="All routes"
       />,
     )
+    // Folded on arrival so a long breakdown cannot push the call to action off a phone.
+    expect(screen.queryByText("Day 1")).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "Daily breakdown" }))
     expect(screen.getByText("Day 1")).toBeInTheDocument()
+  })
+
+  it("lets the pitch be folded away, and shows it on arrival", async () => {
+    render(
+      <PublicRouteDetail
+        route={route({ description: "Launches from a shingle beach." })}
+        season={null}
+        backHref="/explore"
+        backLabel="All routes"
+      />,
+    )
+    expect(screen.getByTestId("route-pitch")).toBeInTheDocument()
+    await userEvent.click(screen.getByRole("button", { name: "About this route" }))
+    expect(screen.queryByTestId("route-pitch")).not.toBeInTheDocument()
+  })
+
+  it("renders the actions after every section, so folding them away leaves the call to action in reach", () => {
+    render(
+      <PublicRouteDetail
+        route={route({ description: "A pitch." })}
+        season={null}
+        backHref="/explore"
+        backLabel="All routes"
+        actions={<button type="button">Use this route</button>}
+      />,
+    )
+    const action = screen.getByRole("button", { name: "Use this route" })
+    const lastSection = screen.getByRole("button", { name: "Daily breakdown" })
+    expect(
+      lastSection.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it("links to a linkable original author's public profile, by username", () => {

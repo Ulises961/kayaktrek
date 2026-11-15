@@ -5,6 +5,7 @@ import { BrandLockup } from "@/components/common/brand-lockup"
 import { SeasonBadge } from "@/components/explore/season-badge"
 import { DifficultyBadge } from "@/components/common/difficulty-badge"
 import { RouteDayBreakdown } from "@/components/explore/route-day-breakdown"
+import { RouteDetailSection } from "@/components/explore/route-detail-section"
 import { routePhotos } from "@/lib/itinerary/public-routes"
 import type { RouteData } from "@/lib/itinerary/public-routes"
 import { RoutePlaces } from "@/components/explore/route-places"
@@ -65,10 +66,10 @@ export function PublicRouteDetail({
         <BrandLockup size={20} wordmarkClassName="text-sm" />
       </div>
 
-      {/* `min-h-0 flex-1` hands the day list whatever height is left instead of
-          leaving it stranded above empty panel — on a viewport taller than it is
-          wide, that is most of the panel. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
+      {/* No fixed height: the content takes the room it needs and the panel above is
+          what scrolls, so the padding at the foot is part of the scrolled content and
+          the call to action rests clear of the edge instead of against it. */}
+      <div className="flex flex-col gap-4 p-5 pb-8">
         <BackLink href={backHref} label={backLabel} />
 
         <div className="flex items-start justify-between gap-3">
@@ -97,12 +98,20 @@ export function PublicRouteDetail({
         </div>
         {route.description && (
           // Unclamped, unlike the listing card: this is the page someone opened in
-          // order to read it.
-          <p data-testid="route-pitch" className="text-sm leading-relaxed">
-            {route.description}
-          </p>
+          // order to read it. Open on arrival for the same reason, and foldable
+          // because a long pitch would otherwise fill a phone's whole panel.
+          <RouteDetailSection title="About this route" defaultOpen>
+            <p data-testid="route-pitch" className="text-sm leading-relaxed">
+              {route.description}
+            </p>
+          </RouteDetailSection>
         )}
-        <RouteDayBreakdown days={route.days} avgSpeedKnots={route.avgSpeedKnots} unit={unit} />
+        <RouteDayBreakdown
+          days={route.days}
+          avgSpeedKnots={route.avgSpeedKnots}
+          unit={unit}
+          defaultOpen={false}
+        />
         <RoutePlaces places={places} />
         <RouteGallery photos={routePhotos(route)} />
         {author && (

@@ -92,8 +92,9 @@ test.describe("Public route discovery", () => {
     await expect(page.getByRole("heading", { name: ROUTE_NAME })).toBeVisible()
     // Hemisphere-aware season derived from the July dates + northern latitude.
     await expect(page.getByText("summer")).toBeVisible()
-    // The per-day breakdown is visible before forking — both seeded days appear.
-    await expect(page.getByText("Daily breakdown")).toBeVisible()
+    // The per-day breakdown is one click from visible before forking — it starts folded
+    // so a long one cannot push the call to action off a phone — and both seeded days appear.
+    await page.getByRole("button", { name: "Daily breakdown" }).click()
     await expect(page.getByText("Day 1")).toBeVisible()
     await expect(page.getByText("Day 2")).toBeVisible()
 

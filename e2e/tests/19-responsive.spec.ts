@@ -617,16 +617,14 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
       ).toBeLessThanOrEqual(320)
     })
 
-    test("gives the daily breakdown the panel's leftover height on a tall viewport", async ({
+    test("scrolls the panel as one column and leaves the call to action clear of the edge", async ({
       page,
       request,
     }) => {
-      // The list used to be capped at a fixed `max-h-40` (180px, since rem is
-      // 1.125×) with its own scrollbar. On a viewport taller than it is wide —
-      // a browser's phone emulation, or a phone in a tall aspect — that left the
-      // list scrolling inside a small box with most of the panel empty below it.
-      // It is now sized by what the panel has left.
-      const CAPPED_HEIGHT = 180
+      // The pitch and the breakdown fold away, but a long breakdown opened on a short
+      // phone must still be reachable: the panel scrolls as a whole, and the button at
+      // the foot rests above its bottom edge instead of against it.
+      const BOTTOM_CLEARANCE = 16
       const many = await apiSeedPublicItinerary(request, leaderToken, {
         name: `E2E Responsive Days ${Date.now()}`,
         totalMiles: 30,
@@ -644,25 +642,24 @@ test.describe("Responsive — public and anonymous surfaces (M18 §5)", () => {
         })),
       })
       try {
-        await page.setViewportSize({ width: 390, height: 1200 })
+        await page.setViewportSize({ width: 390, height: 600 })
         await page.goto(`/routes/${many.itineraryId}`)
         await page.waitForLoadState("networkidle")
 
         const panel = page.getByTestId("route-detail-panel")
-        const list = panel.getByRole("list").first()
-        const listBox = (await list.boundingBox())!
-        const panelBox = (await panel.boundingBox())!
+        await panel.getByRole("button", { name: "Daily breakdown" }).click()
 
+        const scrolls = await panel.evaluate((el) => el.scrollHeight > el.clientHeight)
+        expect(scrolls, "ten open days did not make the panel scrollable").toBe(true)
+
+        await panel.evaluate((el) => el.scrollTo({ top: el.scrollHeight }))
+        const action = panel.getByRole("button", { name: /use this route/i })
+        const actionBox = (await action.boundingBox())!
+        const panelBox = (await panel.boundingBox())!
         expect(
-          Math.round(listBox.height),
-          `the breakdown is ${Math.round(listBox.height)}px tall in a ${Math.round(panelBox.height)}px ` +
-            `panel — it is still on the fixed cap with the rest of the panel empty.`,
-        ).toBeGreaterThan(CAPPED_HEIGHT)
-        // Within the panel, not spilling past it — the growth has to come out of
-        // the space that was going to waste, not out of the panel's bounds.
-        expect(Math.round(listBox.y + listBox.height)).toBeLessThanOrEqual(
-          Math.round(panelBox.y + panelBox.height) + 1,
-        )
+          Math.round(panelBox.y + panelBox.height - (actionBox.y + actionBox.height)),
+          "the call to action sits against the bottom edge of the panel",
+        ).toBeGreaterThanOrEqual(BOTTOM_CLEARANCE)
       } finally {
         await apiDeleteItinerary(request, leaderToken, many.itineraryId)
         await apiDeleteTrip(request, leaderToken, many.tripId)

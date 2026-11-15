@@ -748,6 +748,26 @@
   margin-bottom: 2.5rem;
 }
 
+/* ── Map popups follow the theme ──────────────────────────────────────────
+   Leaflet paints its popup surface white and leaves the text to inherit. Popup
+   content is written in theme tokens (`text-foreground`, `text-muted-foreground`),
+   which turn near-white in dark mode, so the title, note and Edit button of a
+   place's popup vanished into the white card. The surface takes the popover
+   tokens instead, so the text and the card always come from the same theme.
+   Unlayered for the same reason as the rules above: `leaflet/dist/leaflet.css`
+   is, and would beat a utility. It is also loaded after this file, along with the
+   map, and declares these very selectors at one class of specificity, so source
+   order would hand it the win. The extra `.leaflet-popup` ancestor is what wins
+   regardless of order. */
+.leaflet-popup .leaflet-popup-content-wrapper,
+.leaflet-popup .leaflet-popup-tip {
+  background: var(--popover);
+  color: var(--popover-foreground);
+}
+.leaflet-container .leaflet-popup a.leaflet-popup-close-button {
+  color: var(--muted-foreground);
+}
+
 /* Plain (unlayered) rules so Lightning CSS always emits them and they win
    over the base `* { border }` reset. */
 /* ── Auth surfaces ────────────────────────────────────────────────────────
