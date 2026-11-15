@@ -27,6 +27,11 @@ export const SSE_URL = resolveOrigin(
   "EXPO_PUBLIC_SSE_URL",
 )
 
+// The web app's public origin — where the flows mobile hands off to the browser live (the legal
+// pages, password reset, cancelling an account deletion). Not an API host, and not configurable:
+// the same address in every build.
+export const WEB_ORIGIN = "https://kayaktrek.app"
+
 // Mirrors frontend/lib/api/config.ts's API_VERSION/API_PREFIX exactly — same backend,
 // same versioning scheme (ADR-031).
 export const API_VERSION = "v1"
