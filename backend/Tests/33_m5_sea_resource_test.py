@@ -154,6 +154,12 @@ def test_get_weather_returns_states(client, auth_headers, app, itinerary):
 
 # ── weather fetch ─────────────────────────────────────────────────────────────
 
+def _dated_day_id(itinerary):
+    """A day that has a date. `Itinerary.days` has no ordering, so `days[0]` may be the undated
+    staging day (Day 0) or a numbered one, depending on how the rows happen to be stored."""
+    return next(day["id"] for day in itinerary["days"] if day["date"])
+
+
 def test_weather_fetch_400_without_date(client, auth_headers, app, itinerary):
     day_id = itinerary["days"][0]["id"]
     with app.app_context():
@@ -172,7 +178,7 @@ def test_weather_fetch_400_without_date(client, auth_headers, app, itinerary):
 
 
 def test_weather_fetch_202_with_date(client, auth_headers, itinerary):
-    day_id = itinerary["days"][0]["id"]
+    day_id = _dated_day_id(itinerary)
     mock_result = MagicMock()
     mock_result.id = "mock-celery-task-id"
     with patch("Resources.sea_resource.fetch_weather") as mock_task:
@@ -202,7 +208,7 @@ def test_weather_refresh_400_without_date(client, auth_headers, app, itinerary):
 
 
 def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerary):
-    day_id = itinerary["days"][0]["id"]
+    day_id = _dated_day_id(itinerary)
     mock_result = MagicMock()
     mock_result.id = "mock-celery-task-id"
     with (
@@ -221,13 +227,13 @@ def test_weather_refresh_202_passes_force_refresh(client, auth_headers, itinerar
 
 
 def test_weather_refresh_403_without_premium_entitlement(client, auth_headers, itinerary):
-    day_id = itinerary["days"][1]["id"]
+    day_id = _dated_day_id(itinerary)
     resp = client.post(f"/api/v1/day/{day_id}/weather/refresh", headers=auth_headers)
     assert resp.status_code == 403
 
 
 def test_weather_refresh_429_within_cooldown(client, auth_headers, itinerary):
-    day_id = itinerary["days"][0]["id"]
+    day_id = _dated_day_id(itinerary)
     mock_result = MagicMock()
     mock_result.id = "mock-celery-task-id"
     with (
