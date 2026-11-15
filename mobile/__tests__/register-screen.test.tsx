@@ -34,17 +34,15 @@ type Screen = Awaited<ReturnType<typeof renderRegister>>
 
 async function fill(
   screen: Screen,
-  fields: { mail?: string; confirmMail?: string; username?: string; password?: string },
+  fields: { mail?: string; username?: string; password?: string },
 ) {
   const values = {
     mail: "paddler@example.com",
-    confirmMail: "paddler@example.com",
     username: "paddler_1",
     password: VALID_PASSWORD,
     ...fields,
   }
   await fireEvent.changeText(screen.getByTestId("register-email"), values.mail)
-  await fireEvent.changeText(screen.getByTestId("register-confirm-email"), values.confirmMail)
   await fireEvent.changeText(screen.getByTestId("register-username"), values.username)
   await fireEvent.changeText(screen.getByTestId("register-password"), values.password)
 }
@@ -73,22 +71,24 @@ describe("RegisterScreen", () => {
     expect(mockReplace).toHaveBeenCalledWith({ pathname: "/login", params: { registered: "1" } })
   })
 
-  it("accepts a confirmation that differs only in case or surrounding space", async () => {
+  it("trims the address before sending it", async () => {
     const screen = await renderRegister()
 
-    await fill(screen, { confirmMail: " Paddler@Example.com " })
+    await fill(screen, { mail: "  paddler@example.com " })
     await fireEvent.press(screen.getByTestId("register-submit"))
 
-    await waitFor(() => expect(mockRegister).toHaveBeenCalled())
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledWith("paddler@example.com", "paddler_1", VALID_PASSWORD)
+    })
   })
 
-  it("refuses mismatched addresses before anything is sent", async () => {
+  it("refuses a malformed address before anything is sent", async () => {
     const screen = await renderRegister()
 
-    await fill(screen, { confirmMail: "paddler@exmaple.com" })
+    await fill(screen, { mail: "paddler@" })
     await fireEvent.press(screen.getByTestId("register-submit"))
 
-    expect(await screen.findByText("The email addresses do not match.")).toBeTruthy()
+    expect(await screen.findByText("Enter a valid email address.")).toBeTruthy()
     expect(mockRegister).not.toHaveBeenCalled()
     expect(mockReplace).not.toHaveBeenCalled()
   })

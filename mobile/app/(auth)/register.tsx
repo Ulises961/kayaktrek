@@ -2,7 +2,7 @@ import { Link, Redirect, useRouter } from "expo-router"
 import { useState } from "react"
 import { Linking, Pressable } from "react-native"
 
-import { RegisterFormSchema } from "@shared/auth/schemas"
+import { RegisterSchema } from "@shared/auth/schemas"
 
 import { AuthScreen } from "../../components/auth/auth-screen"
 import { PasswordRules } from "../../components/auth/password-rules"
@@ -22,7 +22,6 @@ export default function RegisterScreen() {
   const { status } = useAuth()
   const router = useRouter()
   const [mail, setMail] = useState("")
-  const [confirmMail, setConfirmMail] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -36,9 +35,8 @@ export default function RegisterScreen() {
   async function handleSubmit() {
     setError(null)
 
-    const parsed = RegisterFormSchema.safeParse({
+    const parsed = RegisterSchema.safeParse({
       mail: mail.trim(),
-      confirmMail,
       username: username.trim(),
       password,
     })
@@ -80,24 +78,6 @@ export default function RegisterScreen() {
             testID="register-email"
           />
           {errors.mail ? <Text className="text-sm text-destructive">{errors.mail}</Text> : null}
-        </Stack>
-
-        {/* Asked twice because the account is useless until a mail reaches this address: a
-            typo here strands it behind a verification link that goes to a stranger. */}
-        <Stack className="gap-1.5">
-          <Label>Confirm email</Label>
-          <Input
-            value={confirmMail}
-            onChangeText={setConfirmMail}
-            autoCapitalize="none"
-            autoComplete="off"
-            autoCorrect={false}
-            keyboardType="email-address"
-            testID="register-confirm-email"
-          />
-          {errors.confirmMail ? (
-            <Text className="text-sm text-destructive">{errors.confirmMail}</Text>
-          ) : null}
         </Stack>
 
         <Stack className="gap-1.5">
