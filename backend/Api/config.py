@@ -22,11 +22,25 @@ def _frontend_url() -> str:
     return raw_value.rstrip("/")
 
 
+_FALSE_WORDS = frozenset({"0", "false", "no", "off"})
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """A boolean environment variable: unset or blank is `default`, and `0`, `false`, `no`
+    or `off` (any case) is False. Everything else is True."""
+    raw_value = os.getenv(name, "").strip().lower()
+    if not raw_value:
+        return default
+    return raw_value not in _FALSE_WORDS
+
+
 class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     MAIL_SERVER = os.getenv("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.getenv("MAIL_PORT", 587))
-    MAIL_USE_TLS = True
+    # On for every real relay. The local mailpit sink speaks plain SMTP and offers no STARTTLS,
+    # so the dev stack turns it off; with it on, every send there fails and nothing is caught.
+    MAIL_USE_TLS = _env_flag("MAIL_USE_TLS", True)
     MAIL_USERNAME = os.getenv("MAIL_USERNAME")
     MAIL_PASSWORD = os.getenv("MAIL_PASSWORD")
     # Falls back to MAIL_USERNAME because Gmail SMTP rejects a sender that doesn't match the

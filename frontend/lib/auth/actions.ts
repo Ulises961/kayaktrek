@@ -10,6 +10,7 @@ import {
   LoginSchema,
   RegisterSchema,
   ForgotPasswordSchema,
+  ResendVerificationSchema,
   ResetPasswordSchema,
 } from "@/lib/auth/schemas"
 
@@ -231,6 +232,38 @@ export async function forgotPassword(
   }
 
   return { success: true }
+}
+
+/**
+ * Ask for a fresh verification link for an address. The backend answers every address the
+ * same way, so success says nothing about whether the account exists; a wrongly typed
+ * address is corrected by support, not here.
+ */
+export async function resendVerification(
+  _prevState: AuthResult | null,
+  formData: FormData,
+): Promise<AuthResult> {
+  const parsed = ResendVerificationSchema.safeParse({ mail: formData.get("mail") })
+  if (!parsed.success) {
+    return { success: false, error: "Enter a valid email address." }
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${API_URL}${API_PREFIX}/auth/resend-verification`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mail: parsed.data.mail }),
+    })
+  } catch {
+    return { success: false, error: "Could not reach the server. Please try again." }
+  }
+
+  if (res.ok) return { success: true }
+  if (res.status === 429) {
+    return { success: false, error: "Too many attempts. Please try again in a while." }
+  }
+  return { success: false, error: "Something went wrong. Please try again." }
 }
 
 export async function resetPassword(

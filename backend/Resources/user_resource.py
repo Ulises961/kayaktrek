@@ -14,7 +14,7 @@ from Schemas.user_schema import UserSchema, UserUpdateSchema, PublicUserSchema
 from Services.user_service import UserService
 from Services.log_service import LogService
 from Services.storage_service import StorageService, StorageValidationError
-from Services.auth_service import AuthService
+from Services.auth_service import AccountAlreadyVerifiedError, AuthService, MailAddressTakenError
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_self, require_admin
 from Api.features import require_medical_notes
@@ -1117,3 +1117,58 @@ def delete(id: str) -> ResponseReturnValue:
         abort(HTTPStatus.NOT_FOUND, description=f"User with id {id} not found")
     except IntegrityError:
         abort(HTTPStatus.CONFLICT, description=f"Error deleting user with id {id}")
+
+
+@user_api.route("/correct-unverified-mail", methods=["POST"])
+@JWTService.authenticate_restful
+@require_admin()
+def correct_unverified_mail() -> ResponseReturnValue:
+    """
+    Admin-only: move an unverified account to the address its owner meant to type, and send
+    the verification link there.
+    ---
+    post:
+      summary: Admin correction of a mistyped signup address
+      description: >
+        For an owner who mistyped their email at registration and wrote to support. The
+        account's pending verification links are voided and a fresh one is mailed to
+        `newMail`. Only unverified accounts qualify.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, newMail]
+              properties:
+                username:
+                  type: string
+                newMail:
+                  type: string
+                  format: email
+      responses:
+        200:
+          description: The account was moved and a verification email sent
+        400:
+          description: Missing field or malformed address
+        403:
+          description: Caller is not an admin
+        404:
+          description: No account with that username
+        409:
+          description: The account is already verified, or the address belongs to another account
+    """
+    data = request.get_json(silent=True) or {}
+    username, new_mail = data.get("username"), data.get("newMail")
+    if not isinstance(username, str) or not isinstance(new_mail, str) or not username or not new_mail:
+        abort(HTTPStatus.BAD_REQUEST, description="Missing username or newMail")
+    try:
+        user = AuthService.admin_correct_unverified_mail(username, new_mail, g.current_user_id)
+    except NoResultFound:
+        abort(HTTPStatus.NOT_FOUND, description=f"No account with username {username}")
+    except AccountAlreadyVerifiedError:
+        abort(HTTPStatus.CONFLICT, description="This account is already verified")
+    except MailAddressTakenError:
+        abort(HTTPStatus.CONFLICT, description="That address belongs to another account")
+    except ValueError as error:
+        abort(HTTPStatus.BAD_REQUEST, description=str(error))
+    return jsonify({"status": "success", "username": user.username, "mail": user.mail}), HTTPStatus.OK

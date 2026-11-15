@@ -13,7 +13,7 @@ from Models.user_endorses_log import user_endorses_log
 from Models.connection import Connection
 from Models.block import Block
 from datetime import datetime
-from sqlalchemy import String, Boolean, Integer, Text, DateTime, Enum
+from sqlalchemy import String, Boolean, Integer, Text, DateTime, Enum, Index, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import Any, List, Optional, TYPE_CHECKING
 
@@ -34,6 +34,7 @@ class UnitPreferenceType(enum.Enum):
 
 class User(BaseModel):
     __tablename__ = "users"
+    __table_args__ = (Index("uq_users_mail_lower", func.lower(text("mail")), unique=True),)
 
     def __init__(
         self,

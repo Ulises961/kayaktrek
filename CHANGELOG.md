@@ -7,6 +7,65 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.6.0] - 2026-11-15
+
+### Added
+
+- **An admin page for correcting a mistyped signup address.** Someone who typed their email wrong
+  when signing up never got the verification link and had no way out. They now write to support,
+  and an administrator opens Admin in the account menu, enters their username and the address they
+  meant, and the account is moved there with a fresh verification link. Only accounts that are not
+  yet verified qualify, and the page does not exist for anyone who is not an administrator.
+- **A mail health check for monitoring.** `GET /api/v1/health/mail` answers 503 for an hour after
+  any email failed to send, and 200 otherwise, so an uptime monitor can tell when verification or
+  password-reset mail has stopped going out. It is separate from `/api/v1/health`, which still
+  decides whether the app counts as up.
+
+### Changed
+
+- **Email addresses no longer care about capital letters or stray spaces.** They are stored
+  lower-case and trimmed, and every lookup does the same, so `Paddler@Example.com` and
+  `paddler@example.com` are one account. The database now enforces it.
+- **The resend-verification page asks for an email only,** and tells anyone whose address was
+  mistyped to contact support. Behind it, the resend request now answers every address the same
+  way, whether or not it belongs to an account, so the page cannot be used to find out who is
+  registered. It used to answer "not found" for an unknown address.
+- **A failed email send is now logged with its cause** (the template, the error and the provider's
+  status code), and no longer logs the recipient's address.
+
+### Fixed
+
+- **A capital letter at password reset no longer finds nobody.** Reset, sign-in, resend and the
+  already-registered notice all matched addresses exactly as typed, so a differently cased address
+  quietly sent nothing.
+- **Mail from the local development stack now arrives in the local mail inbox** (mailpit, on port
+  8025). It never did before, because the stack insisted on an encrypted connection mailpit does
+  not offer. Nothing changes for a real deployment.
+
+### Security
+
+- Updated the OpenTelemetry libraries to 1.45.2 for a published advisory, and moved the web app to
+  Next 16.4.6 along with the routine dependency updates.
+- Updated the backend's libraries, among them the Redis client (8.x), `cryptography` (50.x) and the
+  timezone lookup (9.x, which reads a new data file; time zones come out the same). SQLAlchemy is
+  held below 2.1, whose change of default database driver would break the plain `postgresql://`
+  connection strings this app is deployed with.
+
+### Deploy notes
+
+- **Check for clashing addresses before deploying.** The migration refuses to run, and stops the
+  deploy, if two accounts differ only by capital letters or surrounding spaces in their address,
+  because lower-casing would merge them. Run
+  `SELECT lower(btrim(mail)), count(*) FROM users GROUP BY 1 HAVING count(*) > 1` first; no rows
+  means it is safe. Any row needs one of those accounts renamed by hand.
+- **During the deploy window, old code still compares addresses exactly** against rows that are now
+  lower-case, so someone typing a capital letter can miss for the length of the deploy.
+- **The Admin page needs an administrator account.** Set `users.admin = true` in the database for
+  whoever should have it; there is no screen for that.
+- **Add the mail monitor by hand in Uptime Kuma** (`https://api.<domain>/api/v1/health/mail`, row in
+  `DEPLOY.md`); nothing in the repository deploys Kuma.
+- No new environment variables.
+
 ## [1.5.0] - 2026-11-06
 
 ### Added

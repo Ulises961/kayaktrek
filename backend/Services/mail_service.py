@@ -1,15 +1,21 @@
 import logging
+import time
+import uuid
 from email.utils import parseaddr
-from typing import Any
+from typing import Any, Optional
 
 import requests
 from flask import current_app, render_template
 from flask_mail import Message
 
 from Api.mail import mail
+from Api.redis import monitoring_redis
 from Services import storage_service
 
 logger = logging.getLogger(__name__)
+
+SEND_FAILURES_KEY = "mail:send_failures"
+SEND_FAILURE_WINDOW_SECONDS = 3600
 
 # Object key of the rasterised brand mark in the public bucket. Written by
 # scripts/build-mail-mark.sh; the committed copy is docs/brand/mail-mark-96.png.
@@ -105,8 +111,49 @@ def send_template_email(to: str, subject: str, template: str, **ctx: Any) -> Non
             msg.body = text_body
             msg.html = html_body
             mail.send(msg)
-    except Exception as e:
-        logger.error(
+    except Exception as err:
+        # The recipient is left out on purpose: it is personal data, and the template, the
+        # status and the traceback are what diagnose a transport fault.
+        logger.exception(
             "email_send_failed",
-            extra={"to": to, "template": template, "error": str(e)},
+            extra={
+                "template": template,
+                "error_type": type(err).__name__,
+                "status_code": getattr(getattr(err, "response", None), "status_code", None),
+            },
         )
+        record_send_failure()
+
+
+def record_send_failure() -> None:
+    """
+    Remember that a send just failed, for `recent_send_failure_count`.
+
+    A failed send is swallowed on purpose (no caller can act on it, and a no-oracle endpoint
+    must answer the same whether or not mail went out), which is exactly why something outside
+    the request has to be able to see it. Never raises: this runs inside the failure handler.
+    """
+    now = time.time()
+    try:
+        pipeline = monitoring_redis().pipeline()
+        pipeline.zadd(SEND_FAILURES_KEY, {f"{now}:{uuid.uuid4().hex}": now})
+        pipeline.zremrangebyscore(SEND_FAILURES_KEY, 0, now - SEND_FAILURE_WINDOW_SECONDS)
+        pipeline.expire(SEND_FAILURES_KEY, SEND_FAILURE_WINDOW_SECONDS)
+        pipeline.execute()
+    except Exception as error:
+        # Broad for the reason SessionService's denylist is: an unavailable Redis is not only
+        # RedisError (a malformed URL is a ValueError, a dead socket an OSError), and none of
+        # them may turn a swallowed send failure into a failed request.
+        logger.warning("email_failure_not_recorded", extra={"error": str(error)})
+
+
+def recent_send_failure_count() -> Optional[int]:
+    """
+    How many sends failed in the last `SEND_FAILURE_WINDOW_SECONDS`, or None when the record
+    cannot be read — an unreadable record is not the same as a clean one.
+    """
+    try:
+        return int(monitoring_redis().zcount(SEND_FAILURES_KEY, time.time() - SEND_FAILURE_WINDOW_SECONDS, "+inf"))
+    except Exception as error:
+        logger.warning("email_failure_count_unreadable", extra={"error": str(error)})
+        return None

@@ -2,7 +2,14 @@
 
 import Link from "next/link"
 import { useTransition } from "react"
-import { LogInIcon, LogOutIcon, SettingsIcon, UserIcon, UserPlusIcon } from "lucide-react"
+import {
+  LogInIcon,
+  LogOutIcon,
+  SettingsIcon,
+  ShieldCheckIcon,
+  UserIcon,
+  UserPlusIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -21,6 +28,8 @@ interface UserMenuAccount {
   username?: string | null
   mail: string
   avatarUrl?: string | null
+  // Only offers the entry; the Admin page and every admin endpoint check for themselves.
+  isAdmin?: boolean
 }
 
 interface UserMenuProps {
@@ -96,6 +105,14 @@ export function UserMenu({ account, isAuthenticated = true }: UserMenuProps) {
                 Settings
               </Link>
             </DropdownMenuItem>
+            {account?.isAdmin && (
+              <DropdownMenuItem asChild>
+                <Link href="/admin">
+                  <ShieldCheckIcon />
+                  Admin
+                </Link>
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuSeparator />
 

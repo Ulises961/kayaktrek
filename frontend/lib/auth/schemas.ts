@@ -45,6 +45,10 @@ export const ForgotPasswordSchema = z.object({
   mail: z.string().email("Enter a valid email address."),
 })
 
+export const ResendVerificationSchema = z.object({
+  mail: z.string().email("Enter a valid email address."),
+})
+
 export const ResetPasswordSchema = z
   .object({
     token: z.string().min(1, "Missing token."),
@@ -65,5 +69,6 @@ export const ResetPasswordSchema = z
 
 export type LoginInput = z.infer<typeof LoginSchema>
 export type RegisterInput = z.infer<typeof RegisterSchema>
+export type ResendVerificationInput = z.infer<typeof ResendVerificationSchema>
 export type ForgotPasswordInput = z.infer<typeof ForgotPasswordSchema>
 export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>

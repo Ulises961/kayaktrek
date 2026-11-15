@@ -148,6 +148,12 @@ export function LoginForm() {
           Create one
         </Link>
       </p>
+
+      <p className="auth-footnote text-center text-[11px]">
+        <Link href="/resend-verification" className="auth-link">
+          Didn&apos;t get your verification email?
+        </Link>
+      </p>
     </AuthCard>
   )
 }

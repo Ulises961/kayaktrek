@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest"
 import {
   LoginSchema,
   RegisterSchema,
+  ResendVerificationSchema,
   PASSWORD_RULES,
   ForgotPasswordSchema,
   ResetPasswordSchema,
@@ -213,5 +214,17 @@ describe("ResetPasswordSchema", () => {
     it("accepts when confirmPassword matches password exactly", () => {
       expect(ResetPasswordSchema.safeParse(valid).success).toBe(true)
     })
+  })
+})
+
+describe("ResendVerificationSchema", () => {
+  it("accepts an email address", () => {
+    expect(ResendVerificationSchema.safeParse({ mail: "kayaker@example.com" }).success).toBe(true)
+  })
+
+  it("rejects a malformed or missing address", () => {
+    expect(ResendVerificationSchema.safeParse({ mail: "nope" }).success).toBe(false)
+    expect(ResendVerificationSchema.safeParse({ mail: "" }).success).toBe(false)
+    expect(ResendVerificationSchema.safeParse({}).success).toBe(false)
   })
 })

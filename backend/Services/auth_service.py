@@ -15,6 +15,7 @@ from Models.user import User
 from Schemas.user_schema import UserSchema
 from Services.mail_service import send_template_email
 from Services.session_service import SessionService
+from Services.Utils.mail_address import is_valid_mail, normalize_mail
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,14 @@ _TOKEN_EXPIRY_HOURS = {
 
 # Pre-computed hash used to equalise login timing when the account does not exist.
 _DUMMY_HASH: str = generate_password_hash("timing-equalizer").decode("UTF-8")
+
+
+class AccountAlreadyVerifiedError(Exception):
+    """The account behind a verification request has already been verified."""
+
+
+class MailAddressTakenError(Exception):
+    """The address an account is being moved to already belongs to another account."""
 
 
 class AuthService:
@@ -46,7 +55,7 @@ class AuthService:
         Raises:
             NoResultFound: If no account has this address
         """
-        user = db.session.query(User).filter_by(mail=mail.strip().lower()).first()
+        user = db.session.query(User).filter_by(mail=normalize_mail(mail)).first()
         if user is None:
             raise NoResultFound(f"No account with mail {mail}")
         user.active = True
@@ -66,7 +75,7 @@ class AuthService:
 
         query = db.session.query(User)
         if mail_addr:
-            user = query.filter_by(mail=mail_addr).first()
+            user = query.filter_by(mail=normalize_mail(mail_addr)).first()
         else:
             user = query.filter_by(username=username).first()
 
@@ -103,6 +112,9 @@ class AuthService:
         """
         username = user_json.get("username")
         mail_addr = user_json.get("mail")
+        if isinstance(mail_addr, str):
+            mail_addr = normalize_mail(mail_addr)
+            user_json["mail"] = mail_addr
 
         existing = db.session.query(User).filter(
             (User.username == username) | (User.mail == mail_addr)
@@ -186,7 +198,7 @@ class AuthService:
             NoResultFound: If no user exists with the given mail
             ValueError: If user is already active
         """
-        user = db.session.query(User).filter_by(mail=mail_addr).first()
+        user = db.session.query(User).filter_by(mail=normalize_mail(mail_addr)).first()
         if not user:
             raise NoResultFound(f"No user with mail {mail_addr}")
         if user.active:
@@ -203,12 +215,62 @@ class AuthService:
         AuthService._send_verification_email(user)
 
     @staticmethod
+    def admin_correct_unverified_mail(username: str, new_mail: str, admin_id: str) -> User:
+        """
+        Move an unverified account to the address its owner meant to type, and mail a fresh
+        verification link there. An administrator's tool for someone who mistyped their
+        address at signup and so can never receive the original link.
+
+        Unlike the public flows this is allowed to say why it refused: the caller is an
+        authenticated administrator, not an anonymous client probing for registered addresses.
+
+        Args:
+            username: The account to move.
+            new_mail: The address to move it to, in any case and with surrounding space.
+            admin_id: The administrator acting, for the audit log.
+
+        Returns:
+            The updated user, whose `mail` is the stored (normalised) form.
+
+        Raises:
+            NoResultFound: No account has this username.
+            AccountAlreadyVerifiedError: The account is already verified, so its address is
+                not a signup typo and is changed through the owner's own email-change flow.
+            ValueError: `new_mail` is malformed.
+            MailAddressTakenError: Another account already holds `new_mail`.
+        """
+        user = db.session.query(User).filter_by(username=username).first()
+        if user is None:
+            raise NoResultFound(f"No user named {username}")
+        if user.active:
+            raise AccountAlreadyVerifiedError()
+
+        new_mail = normalize_mail(new_mail)
+        if not is_valid_mail(new_mail):
+            raise ValueError("Invalid email format")
+        holder = db.session.query(User).filter_by(mail=new_mail).first()
+        if holder is not None and holder.id != user.id:
+            raise MailAddressTakenError()
+
+        user.mail = new_mail
+        db.session.query(AuthToken).filter_by(
+            user_id=user.id,
+            type=AuthTokenType.VERIFICATION,
+            used=False,
+        ).update({"used": True})
+        db.session.commit()
+
+        AuthService._send_verification_email(user)
+        logger.info("unverified_mail_corrected_by_admin", extra={"user_id": str(user.id), "admin_id": admin_id})
+        return user
+
+    @staticmethod
     def request_password_reset(mail_addr: str) -> None:
         """
         Generate a password reset token and send a reset email.
         Silently succeeds if the mail address is not registered (prevents enumeration).
         """
-        user = db.session.query(User).filter_by(mail=mail_addr).first()
+        user = db.session.query(User).filter_by(mail=normalize_mail(mail_addr)).first()
         if not user:
             return  # silent — do not reveal whether the address is registered
 

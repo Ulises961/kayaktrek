@@ -15,6 +15,7 @@ from Services.mail_service import send_template_email
 from Services.session_service import SessionService
 from Services.user_service import UserService
 from Services.Utils.client_identity import resolve_device_label, resolve_location_label
+from Services.Utils.mail_address import normalize_mail
 from Services.Middleware.auth_middleware import JWTService
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ api = Blueprint("auth", __name__)
 def _resend_key() -> str:
     data = request.get_json(silent=True) or {}
     mail = data.get("mail")
-    return mail if mail else get_remote_address()
+    return normalize_mail(mail) if isinstance(mail, str) and mail else get_remote_address()
 
 
 @api.route("/api/v1/auth/login", methods=["POST"])
@@ -360,11 +361,14 @@ def verify_email_change() -> ResponseReturnValue:
 
 @api.route("/api/v1/auth/resend-verification", methods=["POST"])
 @limiter.limit("3 per hour", key_func=_resend_key)
+@limiter.limit("20 per hour", key_func=get_remote_address)
 def resend_verification() -> ResponseReturnValue:
     """
     ---
     post:
       summary: Resend the account verification email
+      description: >
+        No-oracle: always 200, whether or not the address belongs to an unverified account.
       requestBody:
         content:
           application/json:
@@ -377,20 +381,20 @@ def resend_verification() -> ResponseReturnValue:
                   format: email
       responses:
         200:
-          description: Verification email sent
-        404:
-          description: No account with that email address
+          description: Sent, if applicable
     """
-    data = request.get_json()
-    if not data or not data.get("mail"):
+    data = request.get_json(silent=True) or {}
+    mail = data.get("mail")
+    if not isinstance(mail, str) or not mail:
         abort(HTTPStatus.BAD_REQUEST, description="Missing mail")
     try:
-        AuthService.resend_verification(data["mail"])
-        return jsonify({"status": "success", "message": "Verification email sent"}), HTTPStatus.OK
-    except NoResultFound:
-        abort(HTTPStatus.NOT_FOUND, description="No account with that email address")
-    except ValueError as e:
-        abort(HTTPStatus.BAD_REQUEST, description=str(e))
+        AuthService.resend_verification(mail)
+    except (NoResultFound, ValueError):
+        logger.info("verification_resend_skipped")
+    return jsonify({
+        "status": "success",
+        "message": "If that address has an unverified account, a verification email is on its way.",
+    }), HTTPStatus.OK
 
 
 @api.route("/api/v1/auth/resend-deletion-cancel", methods=["POST"])

@@ -4,6 +4,7 @@ from Schemas.base_schema import BaseSchema, camelcase
 from Schemas.log_schema import LogSchema
 from Schemas.user_certification_schema import UserCertificationSchema
 import re
+from Services.Utils.mail_address import is_valid_mail, normalize_mail
 from Services.Utils.text_sanitizer import sanitize_text
 
 
@@ -69,6 +70,8 @@ class UserSchema(BaseSchema):
         for key in ('name', 'surname', 'bio', 'homeLocation', 'home_location'):
             if key in data and data[key] is not None:
                 data[key] = sanitize_text(data[key])
+        if isinstance(data.get('mail'), str):
+            data['mail'] = normalize_mail(data['mail'])
         return data
 
     @validates('username')
@@ -127,9 +130,7 @@ class UserSchema(BaseSchema):
         if value is not None:
             if len(value) > 255:
                 raise ValidationError("Email cannot exceed 255 characters")
-            # Additional email validation
-            email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
-            if not email_pattern.match(value):
+            if not is_valid_mail(value):
                 raise ValidationError("Invalid email format")
 
     @validates('pwd')
