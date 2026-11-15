@@ -29,6 +29,7 @@ import { Label } from "@mobile/components/ui/label"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
 import { NeedsConnectionNotice, OfflineNotice } from "@mobile/components/ui/offline-notice"
 import { isOfflineError } from "@mobile/lib/api/client"
+import { WEB_ORIGIN } from "@mobile/lib/api/config"
 import { Text } from "@mobile/components/ui/text"
 import { logoutEverywhere } from "@mobile/lib/auth/actions"
 import { CACHE_KEY } from "@mobile/lib/db/cache-freshness"
@@ -52,8 +53,6 @@ import { listSessions, revokeSession } from "@mobile/lib/sessions/actions"
 const header = (
   <RouterStack.Screen options={{ title: "Settings", headerLeft: () => <DrawerToggleButton /> }} />
 )
-
-const WEB_ORIGIN = "https://kayaktrek.app"
 
 function message(err: unknown, fallback: string): string {
   return err instanceof Error ? err.message : fallback

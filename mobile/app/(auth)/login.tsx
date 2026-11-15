@@ -1,129 +1,221 @@
-import { Redirect } from "expo-router"
-import { useState } from "react"
-import { StyleSheet, View } from "react-native"
-import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg"
+import { Link, Redirect, useLocalSearchParams } from "expo-router"
+import { FingerprintPatternIcon } from "lucide-react-native"
+import { useEffect, useState } from "react"
+import { Alert, Linking, Pressable } from "react-native"
 
+import { LoginSchema } from "@shared/auth/schemas"
 import { palette } from "@shared/tokens"
 
-import { BrandLockup } from "../../components/ui/brand-lockup"
-import { BrandMark } from "../../components/ui/brand-mark"
+import { AuthScreen } from "../../components/auth/auth-screen"
 import { Button } from "../../components/ui/button"
 import { Card } from "../../components/ui/card"
 import { Input } from "../../components/ui/input"
 import { Label } from "../../components/ui/label"
-import { Screen, Stack } from "../../components/ui/layout"
+import { Row, Stack } from "../../components/ui/layout"
+import { PasswordInput } from "../../components/ui/password-input"
 import { Text } from "../../components/ui/text"
+import { WEB_ORIGIN } from "../../lib/api/config"
+import { DELETION_PENDING, INVALID_CREDENTIALS } from "../../lib/auth/actions"
 import { useAuth } from "../../lib/auth/auth-context"
+import {
+  canUseBiometrics,
+  clearBiometricCredentials,
+  hasBiometricCredentials,
+  readBiometricCredentials,
+  saveBiometricCredentials,
+} from "../../lib/auth/biometric-store"
+import { fieldErrors } from "../../lib/auth/field-errors"
+
+const REGISTERED_FLAG = "1"
 
 // Once signed in, expo-router's file-based routing takes over the redirect — no
 // navigation call needed here, just render <Redirect>, same pattern as (app)/_layout.tsx.
 export default function LoginScreen() {
   const { status, signIn } = useAuth()
+  // Set by the register screen on its way here, so the account-created notice survives the
+  // navigation without any shared state.
+  const { registered } = useLocalSearchParams<{ registered?: string }>()
   const [mail, setMail] = useState("")
   const [password, setPassword] = useState("")
+  const [errors, setErrors] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
+  const [code, setCode] = useState<string | undefined>()
   const [isPending, setIsPending] = useState(false)
+  const [fingerprintSaved, setFingerprintSaved] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    void hasBiometricCredentials().then((saved) => {
+      if (!cancelled) setFingerprintSaved(saved)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   if (status === "authenticated") {
     return <Redirect href="/" />
   }
 
+  // Offered once, right after a password sign-in that worked — the one moment the password is
+  // known to be right and the user is looking at the phone. Declining costs nothing and the
+  // question comes back the next time they sign in by password.
+  function offerFingerprint(credentials: { mail: string; password: string }) {
+    if (fingerprintSaved || !canUseBiometrics()) return
+    Alert.alert(
+      "Use your fingerprint next time?",
+      "Your email and password are kept on this phone, locked behind your fingerprint.",
+      [
+        { text: "Not now", style: "cancel" },
+        { text: "Use fingerprint", onPress: () => void saveBiometricCredentials(credentials) },
+      ],
+    )
+  }
+
   async function handleSubmit() {
     setError(null)
+    setCode(undefined)
+
+    const parsed = LoginSchema.safeParse({ mail: mail.trim(), password })
+    if (!parsed.success) {
+      setErrors(fieldErrors(parsed.error))
+      return
+    }
+    setErrors({})
+
     setIsPending(true)
-    const result = await signIn(mail, password)
+    const result = await signIn(parsed.data.mail, parsed.data.password)
     setIsPending(false)
-    if (!result.success) setError(result.error)
+    if (result.success) {
+      offerFingerprint(parsed.data)
+      return
+    }
+    setError(result.error)
+    setCode(result.code)
+  }
+
+  async function handleFingerprint() {
+    setError(null)
+    setCode(undefined)
+    setErrors({})
+
+    const saved = await readBiometricCredentials()
+    // Cancelled, or the phone's fingerprints changed and the key was invalidated: either way the
+    // password form is what is left, and it is already on screen.
+    if (!saved) return
+
+    setIsPending(true)
+    const result = await signIn(saved.mail, saved.password)
+    setIsPending(false)
+    if (result.success) return
+
+    // A refused password means the one on file is stale (it was changed elsewhere), so the
+    // shortcut is dropped and offered again after the next password sign-in. Anything else — no
+    // signal, a server hiccup — says nothing about the saved password, which is kept.
+    if (result.code === INVALID_CREDENTIALS) {
+      await clearBiometricCredentials()
+      setFingerprintSaved(false)
+      setError("Your saved password is out of date. Sign in with your password.")
+      return
+    }
+    setError(result.error)
+    setCode(result.code)
   }
 
   return (
-    // Deep ocean — the mobile-appropriate cut of web's ChartBackdrop (a live Leaflet map
-    // behind the auth card, frontend/components/auth/chart-backdrop.tsx): same "the form
-    // sits on the sea" idea, without pulling a map SDK and public-route fetch into a
-    // static hero. The card below is the cartouche.
-    //
-    // The gradient is drawn with react-native-svg, which is already a dependency (the
-    // brand mark is SVG), rather than with expo-linear-gradient as the M30 plan WP1
-    // suggested. Same result, one fewer native module — and no dev-client rebuild, so
-    // this ships as a JS-only change.
-    <Screen className="items-center justify-center bg-ocean-900 p-6">
-      <HeroBackdrop />
+    <AuthScreen>
+      <Card className="w-full gap-6 p-6">
+        {registered === REGISTERED_FLAG && (
+          <Text className="text-sm text-foreground" testID="login-registered-notice">
+            Account created — check your email to verify before signing in.
+          </Text>
+        )}
 
-      <Stack className="w-full max-w-sm items-center gap-8">
-        <BrandLockup size={40} textClassName="text-3xl font-semibold tracking-tight text-ocean-50" />
+        <Text className="text-2xl font-semibold">Sign in</Text>
 
-        <Card className="w-full gap-6 p-6">
-          <Text className="text-2xl font-semibold">Sign in</Text>
+        <Stack className="gap-1.5">
+          <Label>Email</Label>
+          <Input
+            value={mail}
+            onChangeText={setMail}
+            autoCapitalize="none"
+            autoComplete="email"
+            autoCorrect={false}
+            keyboardType="email-address"
+            testID="login-email"
+          />
+          {errors.mail ? <Text className="text-sm text-destructive">{errors.mail}</Text> : null}
+        </Stack>
 
-          <Stack className="gap-1.5">
-            <Label>Email</Label>
-            <Input
-              value={mail}
-              onChangeText={setMail}
-              autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
-              testID="login-email"
-            />
-          </Stack>
-
-          <Stack className="gap-1.5">
+        <Stack className="gap-1.5">
+          <Row className="justify-between">
             <Label>Password</Label>
-            <Input
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoComplete="password"
-              testID="login-password"
-            />
+            <Pressable
+              onPress={() => void Linking.openURL(`${WEB_ORIGIN}/forgot-password`)}
+              accessibilityRole="link"
+              hitSlop={8}
+              testID="login-forgot-password"
+            >
+              <Text className="text-sm text-primary">Forgot password?</Text>
+            </Pressable>
+          </Row>
+          <PasswordInput
+            value={password}
+            onChangeText={setPassword}
+            autoComplete="current-password"
+            testID="login-password"
+          />
+          {errors.password ? (
+            <Text className="text-sm text-destructive">{errors.password}</Text>
+          ) : null}
+        </Stack>
+
+        {code === DELETION_PENDING ? (
+          <Stack className="gap-1.5" testID="login-deletion-pending">
+            <Text className="text-sm font-medium">This account is scheduled for deletion.</Text>
+            <Text className="text-sm text-muted-foreground">
+              Check your email for a cancellation link, or request a new one.
+            </Text>
+            <Pressable
+              onPress={() => void Linking.openURL(`${WEB_ORIGIN}/cancel-deletion`)}
+              accessibilityRole="link"
+              hitSlop={8}
+              testID="login-cancel-deletion"
+            >
+              <Text className="text-sm text-primary">Request a new link</Text>
+            </Pressable>
           </Stack>
+        ) : error ? (
+          <Text className="text-sm text-destructive">{error}</Text>
+        ) : null}
 
-          {error ? <Text className="text-sm text-destructive">{error}</Text> : null}
-
+        <Stack className="gap-3">
           <Button onPress={handleSubmit} disabled={isPending} testID="login-submit">
             {isPending ? "Signing in…" : "Sign in"}
           </Button>
-        </Card>
-      </Stack>
-    </Screen>
+
+          {fingerprintSaved ? (
+            <Button
+              variant="outline"
+              onPress={handleFingerprint}
+              disabled={isPending}
+              icon={<FingerprintPatternIcon size={20} color={palette.ocean500} />}
+              testID="login-fingerprint"
+            >
+              Sign in with fingerprint
+            </Button>
+          ) : null}
+        </Stack>
+
+        <Row className="justify-center gap-1">
+          <Text className="text-sm text-muted-foreground">No account?</Text>
+          <Link href="/register" asChild>
+            <Pressable accessibilityRole="link" hitSlop={8} testID="login-create-account">
+              <Text className="text-sm text-primary">Create one</Text>
+            </Pressable>
+          </Link>
+        </Row>
+      </Card>
+    </AuthScreen>
   )
 }
-
-// A low-contrast lift off the flat ocean-900 ground: the sea reads deeper at the top and
-// opens up toward the horizon, and the compass sits behind the card as texture.
-const WATERMARK_SIZE = 320
-const WATERMARK_OPACITY = 0.07
-
-function HeroBackdrop() {
-  return (
-    // `pointerEvents="none"` is load-bearing, not decoration: this covers the whole
-    // screen, so without it every press on the form below lands here instead.
-    <View testID="login-hero" pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Svg width="100%" height="100%">
-        <Defs>
-          <LinearGradient id="oceanDepth" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={palette.ocean900} />
-            <Stop offset="1" stopColor={palette.ocean600} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#oceanDepth)" />
-      </Svg>
-
-      <View testID="login-hero-watermark" style={styles.watermark}>
-        <BrandMark size={WATERMARK_SIZE} color={palette.ocean100} opacity={WATERMARK_OPACITY} />
-      </View>
-    </View>
-  )
-}
-
-const styles = StyleSheet.create({
-  watermark: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-})
