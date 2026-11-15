@@ -35,6 +35,7 @@ import { lightTokens, palette } from "@shared/tokens";
 import { CrewPositionMarkers } from "@mobile/components/live/crew-position-markers";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
+import { EditModeButton } from "@mobile/components/trips/edit-mode-button";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
 import { MapVelocityOverlay } from "@mobile/components/trips/map-velocity-overlay";
 import { UndoSnackbar } from "@mobile/components/trips/undo-snackbar";
@@ -45,11 +46,13 @@ import { Text } from "@mobile/components/ui/text";
 import { CACHE_KEY, readCachedAt } from "@mobile/lib/db/cache-freshness";
 import { loadOfflineTrip } from "@mobile/lib/db/offline-itinerary";
 import { requestPush } from "@mobile/lib/db/push-pending";
+import { canEditRoute, READ_ONLY_PARAM } from "@mobile/lib/itinerary/edit-mode";
 import { isPointDraggable } from "@mobile/lib/itinerary/point-drag";
 import { routeIsOnPhone, type RouteSample } from "@mobile/lib/itinerary/route-source";
 import { getPushStatus } from "@mobile/lib/network/push-status";
 import { editRoute, loadRouteSyncState } from "@mobile/lib/db/route-edit";
 import { pullRoute } from "@mobile/lib/db/route-sync";
+import { loadCachedTripState } from "@mobile/lib/db/trip-list-cache";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
 import { useTripChanges } from "@mobile/lib/live/use-trip-changes";
 import { buildDayColoredRoute } from "@mobile/lib/itinerary/day-route";
@@ -80,6 +83,8 @@ type ScreenTrip = {
   // Known only from a live read: the live crew layer is for a trip under way, and offline there is
   // no one to poll.
   isHappening?: boolean;
+  // Same: only a live read carries it. Offline, the trip-list cache answers (`cachedTripState`).
+  state?: string | null;
 };
 
 // Same fallback web's builder uses (map-builder.tsx) when the itinerary has never
@@ -125,6 +130,11 @@ export default function TripMapScreen() {
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [zoom, setZoom] = useState(10);
   const [isLeader, setIsLeader] = useState(false);
+  // M42: the screen opens in view mode and only the leader of a trip that is not over can switch
+  // to edit mode (see canEditRoute). `editing` is what was asked for; `isEditing` below is what is
+  // allowed, and the only one the gestures read.
+  const [editing, setEditing] = useState(false);
+  const [cachedTripState, setCachedTripState] = useState<string | null>(null);
   const [inConflict, setInConflict] = useState(false);
   const [draftPoint, setDraftPoint] = useState<DraftPoint | null>(null);
   const [addingPoint, setAddingPoint] = useState(false);
@@ -227,6 +237,7 @@ export default function TripMapScreen() {
         days,
         avgSpeedKnots: t.itinerary?.avgSpeedKnots ?? DEFAULT_AVG_SPEED_KNOTS,
         isHappening: t.state === TRIP_STATE.HAPPENING,
+        state: t.state ?? null,
       });
       setIsOffline(false);
       setCachedAt(null);
@@ -282,10 +293,34 @@ export default function TripMapScreen() {
     void isTripLeader(id).then((leader) => {
       if (!cancelled) setIsLeader(leader);
     });
+    void loadCachedTripState(id).then((state) => {
+      if (!cancelled) setCachedTripState(state);
+    });
     return () => {
       cancelled = true;
     };
   }, [id]);
+
+  const canEdit = canEditRoute({ isLeader, tripState: trip?.state ?? cachedTripState });
+  const isEditing = editing && canEdit;
+
+  // The right to edit can go while the screen is open (the trip moves to past, leadership
+  // changes): drop back to view mode then, so it does not spring back if the right returns.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (!canEdit) setEditing(false);
+  }, [canEdit]);
+
+  // Leaving edit mode takes anything half-done off the map with it: a pending new point would
+  // otherwise sit there with its Add button, in a mode that no longer places points.
+  function toggleEditing() {
+    if (editing) {
+      setDraftPoint(null);
+      setDraftScreenPoint(null);
+      setTooltipSize(null);
+    }
+    setEditing(!editing);
+  }
 
   const days: Day[] = useMemo(() => trip?.days ?? [], [trip]);
 
@@ -301,7 +336,13 @@ export default function TripMapScreen() {
     }));
     router.push({
       pathname: "/trips/[id]/point/[pointId]",
-      params: { id, pointId, images: JSON.stringify(images) },
+      params: {
+        id,
+        pointId,
+        images: JSON.stringify(images),
+        // Opened from view mode, even by the leader, the point screen reads instead of edits.
+        ...(isEditing ? {} : { readOnly: READ_ONLY_PARAM }),
+      },
     });
   }
 
@@ -517,7 +558,8 @@ export default function TripMapScreen() {
       setTooltipSize(null);
       return;
     }
-    if (!isLeader) return;
+    // View mode places nothing: a stray tap on the map must not start a new point.
+    if (!isEditing) return;
 
     const { point, lngLat } = event.nativeEvent;
     const [longitude, latitude] = lngLat;
@@ -654,7 +696,15 @@ export default function TripMapScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <RouterStack.Screen options={{ title: trip.destination ?? "Trip" }} />
+      <RouterStack.Screen
+        options={{
+          title: trip.destination ?? "Trip",
+          // Only the leader of a trip that is not over gets a way into edit mode (M42).
+          headerRight: canEdit
+            ? () => <EditModeButton editing={editing} onToggle={toggleEditing} />
+            : undefined,
+        }}
+      />
 
       {/* M9l WP2 (revised): DayRail is a separate bar above the map, matching web's
           actual layout — not part of ItinerarySheet's handle (M9b3's original design,
@@ -745,9 +795,13 @@ export default function TripMapScreen() {
                 key={point.id ?? index}
                 id={point.id ?? String(index)}
                 lngLat={[point.longitude, point.latitude]}
-                // Leader-only, and only the selected point: any point being draggable let a
+                // Edit mode only, and only the selected point: any point being draggable let a
                 // swipe or pan that crossed one carry it off. Tap a point, then drag it.
-                draggable={isPointDraggable({ isLeader, pointId: point.id, selectedPointId })}
+                draggable={isPointDraggable({
+                  editing: isEditing,
+                  pointId: point.id,
+                  selectedPointId,
+                })}
                 onPress={() => point.id && handlePointPress(point.id)}
                 // Selects the point but deliberately does NOT expand the sheet
                 // (unlike handlePointPress) — see handlePointDragEnd's own note.
@@ -914,8 +968,8 @@ export default function TripMapScreen() {
             days={days}
             avgSpeedKnots={trip.avgSpeedKnots}
             onClosePoint={clearPointSelection}
-            onEditPoint={isLeader ? handleEditPoint : undefined}
-            onDeletePoint={isLeader ? confirmDeletePoint : undefined}
+            onEditPoint={isEditing ? handleEditPoint : undefined}
+            onDeletePoint={isEditing ? confirmDeletePoint : undefined}
             onViewPoint={handleEditPoint}
             expanded={sheetExpanded}
             onExpandedChange={setSheetExpanded}

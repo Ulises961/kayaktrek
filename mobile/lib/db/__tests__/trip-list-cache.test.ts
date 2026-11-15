@@ -3,7 +3,7 @@ import LokiJSAdapter from "nitromelondb/adapters/lokijs"
 
 import { modelClasses, TripSummary } from "../models"
 import { appDatabaseSchema } from "../schema"
-import { saveTripListCache, loadTripListCache } from "../trip-list-cache"
+import { saveTripListCache, loadCachedTripState, loadTripListCache } from "../trip-list-cache"
 
 jest.mock("../database", () => ({ database: {} }))
 
@@ -44,6 +44,31 @@ describe("trip list cache", () => {
         travellerCount: 2,
       },
     ])
+  })
+
+  it("reads one trip's state from the cache, for a screen that needs it with no signal", async () => {
+    const database = createTestDatabase()
+    await saveTripListCache(
+      [
+        { id: "trip-1", destination: "A", state: "happening", dateFrom: null, dateTo: null, travellers: [] },
+        { id: "trip-2", destination: "B", state: "past", dateFrom: null, dateTo: null, travellers: [] },
+      ] as never,
+      database
+    )
+
+    expect(await loadCachedTripState("trip-1", database)).toBe("happening")
+    expect(await loadCachedTripState("trip-2", database)).toBe("past")
+  })
+
+  it("has no state for a trip that was never cached, or cached without one", async () => {
+    const database = createTestDatabase()
+    await saveTripListCache(
+      [{ id: "trip-1", destination: "A", state: null, dateFrom: null, dateTo: null, travellers: [] }] as never,
+      database
+    )
+
+    expect(await loadCachedTripState("trip-1", database)).toBeNull()
+    expect(await loadCachedTripState("trip-9", database)).toBeNull()
   })
 
   it("wholesale-replaces the cache on a second save", async () => {

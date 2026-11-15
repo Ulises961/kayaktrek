@@ -1,4 +1,5 @@
 import type { Database } from "nitromelondb"
+import { Q } from "nitromelondb"
 
 import type { Trip, TripState } from "@shared/dtos/trip"
 import { TRIP_STATES } from "@shared/dtos/trip"
@@ -59,6 +60,16 @@ export async function saveTripListCache(trips: Trip[], database: Database = prod
   // age to whatever renders it (M9c WP7), and a caller that forgets produces a
   // screen that silently shows undated stale data.
   await markCacheFresh(CACHE_KEY.tripList, database)
+}
+
+// One trip's state as the last trip-list fetch saw it, for a screen that has to decide what to
+// offer with no signal (the itinerary's Edit button). Null when the trip is not in the cache.
+export async function loadCachedTripState(
+  tripId: string,
+  database: Database = productionDatabase
+): Promise<TripState | null> {
+  const rows = await database.collections.get<TripSummary>("trips").query(Q.where("id", tripId)).fetch()
+  return asTripState(rows[0]?.state ?? null)
 }
 
 export async function loadTripListCache(database: Database = productionDatabase): Promise<TripCardData[]> {

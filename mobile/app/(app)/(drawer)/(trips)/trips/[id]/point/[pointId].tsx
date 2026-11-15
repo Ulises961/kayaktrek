@@ -22,6 +22,7 @@ import { Text } from "@mobile/components/ui/text";
 import { requestPush } from "@mobile/lib/db/push-pending";
 import { editRoute, loadEditableRoute } from "@mobile/lib/db/route-edit";
 import { isTripLeader } from "@mobile/lib/db/trip-role";
+import { READ_ONLY_PARAM } from "@mobile/lib/itinerary/edit-mode";
 import {
   type EditableRoute,
   editPoint,
@@ -46,10 +47,16 @@ function parseImagesParam(raw: string | undefined): PointImage[] {
 // Pushes straight away on save; a failed push isn't an error here since the
 // sweep retries it later.
 export default function EditPointScreen() {
-  const { id, pointId, images: imagesParam } = useLocalSearchParams<{
+  const {
+    id,
+    pointId,
+    images: imagesParam,
+    readOnly,
+  } = useLocalSearchParams<{
     id: string;
     pointId: string;
     images?: string;
+    readOnly?: string;
   }>();
   const router = useRouter();
   const [route, setRoute] = useState<EditableRoute | null>(null);
@@ -95,8 +102,10 @@ export default function EditPointScreen() {
   }
 
   const point = route?.points.find((candidate) => candidate.id === pointId);
+  // M42: the itinerary's view mode asks for the read-only view even from a leader.
+  const canEditPoint = isLeader === true && readOnly !== READ_ONLY_PARAM;
   const header = (
-    <RouterStack.Screen options={{ title: isLeader ? "Edit point" : "Point" }} />
+    <RouterStack.Screen options={{ title: canEditPoint ? "Edit point" : "Point" }} />
   );
 
   if (!route || isLeader === null) {
@@ -127,7 +136,7 @@ export default function EditPointScreen() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-        {isLeader ? (
+        {canEditPoint ? (
           <PointForm
             initial={{
               name: point.name ?? "",
