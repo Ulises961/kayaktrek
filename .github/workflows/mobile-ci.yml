@@ -86,7 +86,19 @@ jobs:
         run: pnpm run lint
 
       - name: Test
-        run: pnpm run test:run
+        run: pnpm run test:coverage
+
+      # Relative to mobile/, like frontend's is to frontend/ — and both trees have an app/
+      # and a lib/, so the prefix is what keeps the two reports apart in Codecov.
+      - name: Prefix coverage paths with the workspace
+        run: sed -i 's|^SF:|SF:mobile/|' coverage/lcov.info
+
+      - name: Send coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: mobile/coverage/lcov.info
+          flags: mobile
 
       # tokens.ts is the cross-platform source of truth (see that file's own header
       # comment); theme.generated.css is a committed, generated CSS mirror of it (see

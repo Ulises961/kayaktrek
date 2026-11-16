@@ -63,6 +63,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --watch",
     "test:run": "jest",
+    "test:coverage": "jest --coverage",
     "generate:theme": "node --experimental-strip-types scripts/generate-theme-css.js"
   },
   "private": true,
@@ -75,6 +76,17 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "coverageReporters": [
+      "lcov",
+      "text-summary"
+    ],
+    "collectCoverageFrom": [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "lib/**/*.{ts,tsx}",
+      "!**/__tests__/**",
+      "!**/*.d.ts"
+    ],
     "setupFiles": [
       "./jest.setup.ts"
     ],

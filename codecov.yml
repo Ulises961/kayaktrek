@@ -1,0 +1,28 @@
+# Each workspace uploads its own report under its own flag (backend-ci, frontend-ci and
+# mobile-ci), and each workflow only runs when its paths change. Without carryforward a
+# commit that touches only the backend would show frontend and mobile as 0% instead of
+# what they last measured.
+flag_management:
+  default_rules:
+    carryforward: true
+  individual_flags:
+    - name: backend
+      paths:
+        - backend/
+    - name: frontend
+      paths:
+        - frontend/
+    - name: mobile
+      paths:
+        - mobile/
+
+# Informational: Codecov reports the numbers on a PR but never fails it. The test suites are
+# the gate; a coverage percentage is a signal, not a requirement.
+coverage:
+  status:
+    project:
+      default:
+        informational: true
+    patch:
+      default:
+        informational: true

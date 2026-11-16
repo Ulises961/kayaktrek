@@ -40,5 +40,8 @@ yarn-error.*
 /ios
 /android
 
+# Jest coverage output (`pnpm test:coverage`)
+/coverage
+
 # Gradle output of the local native module (the root /android is ignored, a module's is not)
 /modules/*/android/build/

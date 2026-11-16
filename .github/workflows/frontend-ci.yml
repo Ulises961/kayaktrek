@@ -29,6 +29,7 @@ jobs:
     uses: ./.github/workflows/_frontend-validate-run.yml
     with:
       runs-on-json: '["ubuntu-latest"]'
+    secrets: inherit
 
   validate-fallback:
     needs: validate-hosted
@@ -36,6 +37,7 @@ jobs:
     uses: ./.github/workflows/_frontend-validate-run.yml
     with:
       runs-on-json: '["self-hosted","linux","x64"]'
+    secrets: inherit
 
   # See backend-ci.yml's test-result for why this exists and why it's self-hosted.
   validate-result:

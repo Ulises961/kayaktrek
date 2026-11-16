@@ -11,6 +11,9 @@ on:
         description: JSON array of runner labels, e.g. '["ubuntu-latest"]'
         required: true
         type: string
+    secrets:
+      CODECOV_TOKEN:
+        required: false
 
 jobs:
   validate:
@@ -45,8 +48,20 @@ jobs:
         run: pnpm run lint
 
       - name: Test
-        run: pnpm run test:run
-        timeout-minutes: 10
+        run: pnpm run test:coverage
+        timeout-minutes: 15
+
+      # The report's paths are relative to frontend/, and mobile's to mobile/ — both trees
+      # have an app/ and a lib/, so unprefixed they would be indistinguishable to Codecov.
+      - name: Prefix coverage paths with the workspace
+        run: sed -i 's|^SF:|SF:frontend/|' coverage/lcov.info
+
+      - name: Send coverage to Codecov
+        uses: codecov/codecov-action@v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: frontend/coverage/lcov.info
+          flags: frontend
 
       # Both NEXT_PUBLIC_* origins are required: lib/api/config.ts throws on an empty one in
       # a production build, which is the point — a missing repo Variable would otherwise ship
