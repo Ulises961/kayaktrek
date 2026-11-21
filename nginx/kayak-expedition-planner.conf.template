@@ -68,6 +68,15 @@
 # Cloudflare's CNAME flattening makes the tunnel's route work at the zone apex the same
 # as any subdomain, for both the apex redirect and www./app.
 
+# --- TLS protocol floor (2026-11-21) ---
+# Every server block below sets `ssl_protocols TLSv1.2 TLSv1.3;`. Ubuntu's stock nginx.conf
+# allows TLSv1 and TLSv1.1 in its http block, and nothing here overrode it, so the box
+# accepted both. Set per server block, not once at the top of this file: this file is
+# included inside the http block, where nginx.conf already sets the directive, and a second
+# copy at that level fails `nginx -t` with "directive is duplicate". A server-level value
+# overrides the http-level one. The box also hosts other apps' vhosts, so the stock
+# nginx.conf line is left alone here — it is theirs as much as ours.
+
 # --- Upstreams (M33 WP1) ---
 # Named rather than a literal 127.0.0.1:PORT in each proxy_pass, so rolling replacement
 # (M33 WP2) has one place to repoint: edit the `server` line, `nginx -t`, reload. On their own
@@ -101,6 +110,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
     root /var/www/kayak-marketing;
     index index.html;
@@ -117,6 +127,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
     location / {
         return 301 https://app.kayak.example.com$request_uri;
@@ -130,6 +141,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
     if (-f /var/www/kayak-maintenance/maintenance.flag) { return 503; }
     error_page 503 @maintenance;
@@ -158,6 +170,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
     # Default (1m) is tight for avatar/point-image/document uploads that pass through
     # the app rather than going direct-to-MinIO via a presigned URL. Adjust if real
@@ -192,6 +205,7 @@ server {
 
     ssl_certificate     /etc/letsencrypt/live/kayak.example.com/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/kayak.example.com/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
 
     if (-f /var/www/kayak-maintenance/maintenance.flag) { return 503; }
     error_page 503 @maintenance;
