@@ -29,13 +29,20 @@ describe("getPendingRequestsSummary", () => {
 
   it("reads the three counts from the one summary endpoint, not three lists", async () => {
     mockGetSession.mockResolvedValue({ userId: "u1" } as Awaited<ReturnType<typeof getSession>>)
-    mockApiGet.mockResolvedValue({ tripInvitations: 1, buddyRequests: 2, endorsementRequests: 3 })
+    const counts = {
+      tripInvitations: 1,
+      buddyRequests: 2,
+      endorsementRequests: 3,
+      acceptedTripInvitations: 4,
+      acceptedBuddyRequests: 5,
+    }
+    mockApiGet.mockResolvedValue(counts)
 
     const summary = await getPendingRequestsSummary()
 
     expect(mockApiGet).toHaveBeenCalledTimes(1)
     expect(mockApiGet).toHaveBeenCalledWith("/api/pending-requests/summary")
-    expect(summary).toEqual({ tripInvitations: 1, buddyRequests: 2, endorsementRequests: 3 })
+    expect(summary).toEqual(counts)
   })
 
   // The layout renders this on every page; a failing badge must never take the page down.

@@ -165,6 +165,44 @@ def test_viewing_a_trip_notifies_no_one(client, auth_headers, trip_w_o_itinerary
     assert _changes(trip_change_redis, trip_id) == []
 
 
+def test_accepting_an_invitation_tells_the_trip_its_pending_list_changed(
+    client, trip_with_invitation, trip_change_redis
+):
+    """The inviter's crew page lists pending invitations; it can only update if the accept
+    publishes both the invitation leaving and the member arriving."""
+    trip_id = trip_with_invitation["trip"]["id"]
+    trip_change_redis.reset()
+
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invitation",
+        json={"accepted": True},
+        headers=trip_with_invitation["invitee_headers"],
+    )
+
+    assert response.status_code == 200
+    changes = _changes(trip_change_redis, trip_id)
+    assert {change["t"] for change in changes if change["op"] == "delete"} == {"invitation"}
+    assert {change["t"] for change in changes if change["op"] == "create"} >= {"trip_member"}
+
+
+def test_declining_an_invitation_tells_the_trip_its_pending_list_changed(
+    client, trip_with_invitation, trip_change_redis
+):
+    trip_id = trip_with_invitation["trip"]["id"]
+    trip_change_redis.reset()
+
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invitation",
+        json={"accepted": False},
+        headers=trip_with_invitation["invitee_headers"],
+    )
+
+    assert response.status_code == 200
+    changes = _changes(trip_change_redis, trip_id)
+    assert [change["t"] for change in changes if change["op"] == "delete"] == ["invitation"]
+    assert [change for change in changes if change["t"] == "trip_member"] == []
+
+
 def test_editing_a_trip_still_notifies_its_crew(client, auth_headers, trip_w_o_itinerary, trip_change_redis):
     trip_id = trip_w_o_itinerary["id"]
     trip_change_redis.reset()

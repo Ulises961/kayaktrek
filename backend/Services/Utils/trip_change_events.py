@@ -44,6 +44,7 @@ from Models.itinerary import Itinerary
 from Models.log import Log
 from Models.logistics import Logistics
 from Models.medical_notes_access_log import MedicalNotesAccessLog
+from Models.notification import Notification
 from Models.personal_packing_item import PersonalPackingItem
 from Models.place import Place
 from Models.place_category import PlaceCategory
@@ -207,6 +208,7 @@ EXCLUDED_MODELS: dict[type, str] = {
     EndorsementRequest: "per-user, no trip audience",
     Block: "per-user, no trip audience",
     PaddlerConnection: "per-user, no trip audience",
+    Notification: "per-user inbox, no trip audience; read through the pending-requests summary",
     SatelliteFeed: "per-user profile setting, not trip-scoped",
     Item: "per-user gear; a trip sees it through TripRequirement/RequirementContribution",
     ItemCategory: "global reference data",

@@ -5,15 +5,11 @@ vi.mock("@/lib/requests/poll", () => ({ refreshPendingRequests: vi.fn() }))
 
 import { refreshPendingRequests } from "@/lib/requests/poll"
 import { usePendingRequests, PENDING_REQUESTS_POLL_MS } from "../use-pending-requests"
-import type { PendingRequestsSummary } from "@/lib/requests/pending"
+import { EMPTY_PENDING_SUMMARY, type PendingRequestsSummary } from "@/lib/requests/pending"
 
 const mockRefresh = vi.mocked(refreshPendingRequests)
 
-const NONE: PendingRequestsSummary = {
-  tripInvitations: 0,
-  buddyRequests: 0,
-  endorsementRequests: 0,
-}
+const NONE: PendingRequestsSummary = EMPTY_PENDING_SUMMARY
 const ONE_INVITATION: PendingRequestsSummary = { ...NONE, tripInvitations: 1 }
 
 function setVisibility(state: "visible" | "hidden") {
@@ -124,6 +120,21 @@ describe("usePendingRequests", () => {
     await tick(PENDING_REQUESTS_POLL_MS)
     expect(onChange).toHaveBeenCalledTimes(1)
     expect(onChange).toHaveBeenCalledWith(ONE_INVITATION)
+  })
+
+  // An answer to something the user sent arrives as a count of its own, and must be noticed on
+  // its own: nothing else about the summary changed.
+  it("tells its caller when only an answer to the user's own request has arrived", async () => {
+    const onChange = vi.fn()
+    const accepted: PendingRequestsSummary = { ...NONE, acceptedBuddyRequests: 1 }
+    mockRefresh.mockResolvedValueOnce(accepted)
+    const { result } = renderHook(() => usePendingRequests(NONE, onChange))
+
+    await tick(PENDING_REQUESTS_POLL_MS)
+
+    expect(onChange).toHaveBeenCalledTimes(1)
+    expect(onChange).toHaveBeenCalledWith(accepted)
+    expect(result.current).toEqual(accepted)
   })
 
   it("takes the server's counts again when the page is rendered afresh", async () => {

@@ -12,6 +12,7 @@ from Api.database import db
 from Models.connection import Connection, ConnectionStatusType
 from Models.user import User
 from Services.block_service import BlockService
+from Services.notification_service import NotificationService
 
 logger = logging.getLogger(__name__)
 
@@ -134,6 +135,7 @@ class ConnectionService:
         if connection.status is not ConnectionStatusType.ACCEPTED:
             connection.status = ConnectionStatusType.ACCEPTED
             connection.responded_at = datetime.now(timezone.utc)
+            NotificationService.notify_buddy_request_accepted(connection)
             db.session.commit()
             db.session.refresh(connection)
             logger.info(

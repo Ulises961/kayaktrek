@@ -12,7 +12,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import type { NotificationKind } from "@/lib/dtos/pending-requests"
+import { markNotificationsRead } from "@/lib/requests/mutations"
 import {
+  badgeTotal,
+  buildNotificationRows,
   buildPendingRequestRows,
   listsPendingRequests,
   type PendingRequestsSummary,
@@ -27,8 +31,10 @@ interface RequestsMenuProps {
 // invitations, incoming buddy requests, incoming endorsement asks) into one
 // entry that routes each item to where it's actually handled (/invitations,
 // /paddlers, /logs), rather than giving only trip invitations a dedicated
-// sidebar slot. The counts are kept current by polling (usePendingRequests), and when they
-// change on a page that lists the requests themselves, that page is refreshed too.
+// sidebar slot. It also carries the answers to what the user sent: when someone accepts their
+// trip invitation or buddy request, a row says so until they open it. The counts are kept
+// current by polling (usePendingRequests), and when they change on a page that lists the
+// requests themselves, that page is refreshed too.
 export function RequestsMenu({ pendingRequests }: RequestsMenuProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -37,8 +43,14 @@ export function RequestsMenu({ pendingRequests }: RequestsMenuProps) {
   }, [pathname, router])
   const summary = usePendingRequests(pendingRequests, refreshListing)
 
-  const rows = buildPendingRequestRows(summary)
-  const total = summary.tripInvitations + summary.buddyRequests + summary.endorsementRequests
+  const rows = [...buildPendingRequestRows(summary), ...buildNotificationRows(summary)]
+  const total = badgeTotal(summary)
+
+  // Opening a row that reports an answer clears it, and the refresh brings the badge down.
+  async function clearNotification(kind: NotificationKind) {
+    await markNotificationsRead(kind)
+    router.refresh()
+  }
 
   return (
     <DropdownMenu>
@@ -57,8 +69,13 @@ export function RequestsMenu({ pendingRequests }: RequestsMenuProps) {
           <DropdownMenuItem disabled>No pending requests</DropdownMenuItem>
         ) : (
           rows.map((row) => (
-            <DropdownMenuItem key={row.href} asChild>
-              <Link href={row.href}>{row.label}</Link>
+            <DropdownMenuItem key={row.label} asChild>
+              <Link
+                href={row.href}
+                onClick={row.clears ? () => void clearNotification(row.clears!) : undefined}
+              >
+                {row.label}
+              </Link>
             </DropdownMenuItem>
           ))
         )}

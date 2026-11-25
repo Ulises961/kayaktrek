@@ -16,12 +16,19 @@ beforeEach(() => {
 
 describe("refreshPendingRequests", () => {
   it("reads the summary endpoint and returns its counts", async () => {
-    mockApiGet.mockResolvedValue({ tripInvitations: 2, buddyRequests: 1, endorsementRequests: 0 })
+    const summary = {
+      tripInvitations: 2,
+      buddyRequests: 1,
+      endorsementRequests: 0,
+      acceptedTripInvitations: 3,
+      acceptedBuddyRequests: 1,
+    }
+    mockApiGet.mockResolvedValue(summary)
 
     const result = await refreshPendingRequests()
 
     expect(mockApiGet).toHaveBeenCalledWith("/api/pending-requests/summary")
-    expect(result).toEqual({ tripInvitations: 2, buddyRequests: 1, endorsementRequests: 0 })
+    expect(result).toEqual(summary)
   })
 
   it("returns null when the request fails, so the caller keeps what it had", async () => {

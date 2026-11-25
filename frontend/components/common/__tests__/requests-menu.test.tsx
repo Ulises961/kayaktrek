@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { act, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-const { mockRefresh, mockPathname, mockPoll } = vi.hoisted(() => ({
+const { mockRefresh, mockPathname, mockPoll, mockMarkRead } = vi.hoisted(() => ({
   mockRefresh: vi.fn(),
   mockPathname: vi.fn(() => "/dashboard"),
   mockPoll: vi.fn(),
+  mockMarkRead: vi.fn(),
 }))
 
 vi.mock("next/navigation", () => ({
@@ -13,16 +14,20 @@ vi.mock("next/navigation", () => ({
   usePathname: mockPathname,
 }))
 vi.mock("@/lib/requests/poll", () => ({ refreshPendingRequests: mockPoll }))
+vi.mock("@/lib/requests/mutations", () => ({ markNotificationsRead: mockMarkRead }))
 
 import { PENDING_REQUESTS_POLL_MS } from "@/hooks/use-pending-requests"
+import { NOTIFICATION_KIND } from "@/lib/dtos/pending-requests"
+import { EMPTY_PENDING_SUMMARY, type PendingRequestsSummary } from "@/lib/requests/pending"
 import { RequestsMenu } from "../requests-menu"
 
-function renderMenu(pendingRequests: {
-  tripInvitations: number
-  buddyRequests: number
-  endorsementRequests: number
-}) {
-  return render(<RequestsMenu pendingRequests={pendingRequests} />)
+// A full summary from just the counts a test cares about.
+function counts(overrides: Partial<PendingRequestsSummary>): PendingRequestsSummary {
+  return { ...EMPTY_PENDING_SUMMARY, ...overrides }
+}
+
+function renderMenu(pendingRequests: Partial<PendingRequestsSummary>) {
+  return render(<RequestsMenu pendingRequests={counts(pendingRequests)} />)
 }
 
 beforeEach(() => {
@@ -30,6 +35,8 @@ beforeEach(() => {
   mockPathname.mockReturnValue("/dashboard")
   mockPoll.mockReset()
   mockPoll.mockResolvedValue(null)
+  mockMarkRead.mockReset()
+  mockMarkRead.mockResolvedValue({ success: true })
 })
 
 describe("RequestsMenu — live badge", () => {
@@ -43,8 +50,8 @@ describe("RequestsMenu — live badge", () => {
   }
 
   it("raises the badge when a request arrives while the page is open", async () => {
-    mockPoll.mockResolvedValue({ tripInvitations: 0, buddyRequests: 1, endorsementRequests: 0 })
-    renderMenu({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+    mockPoll.mockResolvedValue(counts({ buddyRequests: 1 }))
+    renderMenu({})
     expect(screen.queryByText("1")).not.toBeInTheDocument()
 
     await pollOnce()
@@ -53,8 +60,8 @@ describe("RequestsMenu — live badge", () => {
   })
 
   it("clears the badge when the last request is dealt with elsewhere", async () => {
-    mockPoll.mockResolvedValue({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
-    renderMenu({ tripInvitations: 2, buddyRequests: 0, endorsementRequests: 0 })
+    mockPoll.mockResolvedValue(counts({}))
+    renderMenu({ tripInvitations: 2 })
     expect(screen.getByText("2")).toBeInTheDocument()
 
     await pollOnce()
@@ -68,8 +75,8 @@ describe("RequestsMenu — live badge", () => {
     "refreshes %s when the counts change, so its list shows the new request",
     async (path) => {
       mockPathname.mockReturnValue(path)
-      mockPoll.mockResolvedValue({ tripInvitations: 1, buddyRequests: 0, endorsementRequests: 0 })
-      renderMenu({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+      mockPoll.mockResolvedValue(counts({ tripInvitations: 1 }))
+      renderMenu({})
 
       await pollOnce()
 
@@ -77,10 +84,29 @@ describe("RequestsMenu — live badge", () => {
     },
   )
 
+  // The sender's side: someone accepted what the user sent. It arrives as a notification in the
+  // same bell, so the badge rises, and the buddies page, which lists the request, moves with it.
+  it("raises the badge when a buddy request the user sent is accepted, and refreshes the buddies page", async () => {
+    mockPathname.mockReturnValue("/paddlers")
+    mockPoll.mockResolvedValue(counts({ acceptedBuddyRequests: 1 }))
+    renderMenu({})
+
+    await pollOnce()
+
+    expect(screen.getByText("1")).toBeInTheDocument()
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+  })
+
+  it("counts answers to the user's own requests in the badge with what is waiting on them", () => {
+    renderMenu({ tripInvitations: 1, acceptedTripInvitations: 2, acceptedBuddyRequests: 1 })
+
+    expect(screen.getByText("4")).toBeInTheDocument()
+  })
+
   it("leaves other pages alone when the counts change", async () => {
     mockPathname.mockReturnValue("/trips/abc")
-    mockPoll.mockResolvedValue({ tripInvitations: 1, buddyRequests: 0, endorsementRequests: 0 })
-    renderMenu({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+    mockPoll.mockResolvedValue(counts({ tripInvitations: 1 }))
+    renderMenu({})
 
     await pollOnce()
 
@@ -89,8 +115,8 @@ describe("RequestsMenu — live badge", () => {
   })
 
   it("does not refresh when the poll finds nothing new", async () => {
-    mockPoll.mockResolvedValue({ tripInvitations: 1, buddyRequests: 0, endorsementRequests: 0 })
-    renderMenu({ tripInvitations: 1, buddyRequests: 0, endorsementRequests: 0 })
+    mockPoll.mockResolvedValue(counts({ tripInvitations: 1 }))
+    renderMenu({ tripInvitations: 1 })
 
     await pollOnce()
 
@@ -100,17 +126,17 @@ describe("RequestsMenu — live badge", () => {
 
 describe("RequestsMenu", () => {
   it("shows no count badge when there are no pending requests", () => {
-    renderMenu({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+    renderMenu({})
     expect(screen.queryByText("0")).not.toBeInTheDocument()
   })
 
   it("shows the combined count as a badge", () => {
-    renderMenu({ tripInvitations: 2, buddyRequests: 1, endorsementRequests: 0 })
+    renderMenu({ tripInvitations: 2, buddyRequests: 1 })
     expect(screen.getByText("3")).toBeInTheDocument()
   })
 
   it("lists only nonzero request types, each linking to its home page", async () => {
-    renderMenu({ tripInvitations: 2, buddyRequests: 0, endorsementRequests: 1 })
+    renderMenu({ tripInvitations: 2, endorsementRequests: 1 })
     await userEvent.click(screen.getByRole("button", { name: /pending requests/i }))
 
     const tripLink = await screen.findByRole("menuitem", { name: /2 trip invitations/i })
@@ -122,8 +148,42 @@ describe("RequestsMenu", () => {
     expect(screen.queryByText(/buddy request/i)).not.toBeInTheDocument()
   })
 
+  describe("answers to the user's own requests", () => {
+    it("lists an accepted trip invitation and an accepted buddy request, each linking to its page", async () => {
+      renderMenu({ acceptedTripInvitations: 2, acceptedBuddyRequests: 1 })
+      await userEvent.click(screen.getByRole("button", { name: /pending requests/i }))
+
+      const trips = await screen.findByRole("menuitem", { name: /2 trip invitations accepted/i })
+      expect(trips.closest("a")).toHaveAttribute("href", "/trips")
+      const buddies = screen.getByRole("menuitem", { name: /1 buddy request accepted/i })
+      expect(buddies.closest("a")).toHaveAttribute("href", "/paddlers")
+    })
+
+    it("clears that kind when its row is opened, then refreshes so the badge comes down", async () => {
+      mockMarkRead.mockResolvedValue({ success: true })
+      renderMenu({ acceptedBuddyRequests: 1 })
+      await userEvent.click(screen.getByRole("button", { name: /pending requests/i }))
+
+      await userEvent.click(
+        await screen.findByRole("menuitem", { name: /buddy request accepted/i }),
+      )
+
+      expect(mockMarkRead).toHaveBeenCalledWith(NOTIFICATION_KIND.BUDDY_REQUEST_ACCEPTED)
+      await vi.waitFor(() => expect(mockRefresh).toHaveBeenCalled())
+    })
+
+    it("does not try to clear a row that asks for an answer rather than reporting one", async () => {
+      renderMenu({ buddyRequests: 1 })
+      await userEvent.click(screen.getByRole("button", { name: /pending requests/i }))
+
+      await userEvent.click(await screen.findByRole("menuitem", { name: /1 buddy request/i }))
+
+      expect(mockMarkRead).not.toHaveBeenCalled()
+    })
+  })
+
   it("shows a 'no pending requests' row when everything is zero", async () => {
-    renderMenu({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+    renderMenu({})
     await userEvent.click(screen.getByRole("button", { name: /pending requests/i }))
     expect(await screen.findByText(/no pending requests/i)).toBeInTheDocument()
   })

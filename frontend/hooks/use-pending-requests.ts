@@ -6,12 +6,10 @@ import { refreshPendingRequests } from "@/lib/requests/poll"
 
 export const PENDING_REQUESTS_POLL_MS = 10_000
 
+// Every count, not only the badge's: a change in the requests the user sent (someone accepted)
+// is what tells their own pages that they are out of date.
 function sameCounts(a: PendingRequestsSummary, b: PendingRequestsSummary): boolean {
-  return (
-    a.tripInvitations === b.tripInvitations &&
-    a.buddyRequests === b.buddyRequests &&
-    a.endorsementRequests === b.endorsementRequests
-  )
+  return (Object.keys(a) as (keyof PendingRequestsSummary)[]).every((key) => a[key] === b[key])
 }
 
 // Keeps the notification badge current: starts from what the server rendered, then asks for the

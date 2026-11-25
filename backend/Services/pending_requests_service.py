@@ -8,15 +8,17 @@ from Api.database import db
 from Models.connection import Connection, ConnectionStatusType
 from Models.endorsement_request import EndorsementRequest, EndorsementRequestStatusType
 from Models.invitation import Invitation
+from Services.notification_service import NotificationService
 
 
 class PendingRequestsService:
-    """How many requests are waiting on a user, without loading any of them.
+    """What is waiting on a user, as counts, without loading any of it.
 
     The inbox badge is polled every few seconds, so each count is one `COUNT(*)` rather than
     the list endpoint's eager-loaded rows. Each filter mirrors the list that the count promises:
     a trip invitation that has not expired, a buddy request addressed to the user and still
-    pending, an endorsement ask addressed to the user and still pending.
+    pending, an endorsement ask addressed to the user and still pending. Two more counts are the
+    answers the user has not yet seen to requests they sent (`NotificationService`).
     """
 
     @staticmethod
@@ -49,4 +51,5 @@ class PendingRequestsService:
             "trip_invitations": trip_invitations,
             "buddy_requests": buddy_requests,
             "endorsement_requests": endorsement_requests,
+            **NotificationService.unread_counts(user_uuid),
         }

@@ -1,8 +1,9 @@
 """The inbox badge's poll: how many trip invitations, buddy requests and endorsement asks are
-waiting on the caller, as three counts, without serialising any of them.
+waiting on the caller, and how many answers to the caller's own requests they have not seen yet,
+as counts, without serialising any of them.
 
-The counts must agree with what the three list endpoints return for the same caller, since the
-badge is a promise about what the lists will show.
+The counts must agree with what the list endpoints return for the same caller, since the badge
+is a promise about what the lists will show.
 """
 import json
 from datetime import date, timedelta
@@ -15,6 +16,7 @@ from Models.connection import Connection
 from Models.endorsement_request import EndorsementRequest
 from Models.invitation import Invitation
 from Models.log import Log
+from Models.notification import Notification, NotificationKind
 from Resources.connection_resource import CONNECTION_ENDPOINT
 from Resources.endorsement_request_resource import ENDORSEMENT_REQUEST_ENDPOINT
 from Resources.log_resource import LOG_ENDPOINT
@@ -28,6 +30,7 @@ SUMMARY = f"{PENDING_REQUESTS_ENDPOINT}/summary"
 def _clean(user_1, user_2):
     """Social-graph and log rows persist in the session schema; clear after each test."""
     yield
+    db.session.query(Notification).delete()
     db.session.query(EndorsementRequest).delete()
     db.session.query(Block).delete()
     db.session.query(Connection).delete()
@@ -60,6 +63,8 @@ def test_summary_is_all_zero_when_nothing_is_waiting(client, auth_headers):
         "tripInvitations": 0,
         "buddyRequests": 0,
         "endorsementRequests": 0,
+        "acceptedTripInvitations": 0,
+        "acceptedBuddyRequests": 0,
     }
 
 
@@ -142,6 +147,162 @@ def test_summary_counts_an_incoming_endorsement_request(
 
     assert _summary(client, crew)["endorsementRequests"] == 1
     assert _summary(client, leader)["endorsementRequests"] == 0
+
+
+# ── answers to the caller's own requests ─────────────────────────────────────
+#
+# Accepting a trip invitation or a buddy request leaves a notification for the person who sent
+# it, counted in the same summary so the same bell and the same poll carry it.
+
+NOTIFICATIONS_READ = f"{PENDING_REQUESTS_ENDPOINT}/notifications/read"
+
+
+def _send_buddy_request(client, headers, addressee):
+    response = client.post(
+        f"{CONNECTION_ENDPOINT}/request",
+        headers=headers,
+        json={"addresseeUsername": addressee.username},
+    )
+    assert response.status_code == 201
+    return response.json["id"]
+
+
+def _answer_invitation(client, trip_id, headers, accepted):
+    response = client.post(
+        f"{TRIP_ENDPOINT}/{trip_id}/invitation", headers=headers, json={"accepted": accepted}
+    )
+    assert response.status_code == 200
+
+
+def test_accepting_a_trip_invitation_notifies_the_leader_and_nobody_else(
+    client, trip_with_invitation, auth_headers_2
+):
+    leader = trip_with_invitation["leader_headers"]
+    _answer_invitation(client, trip_with_invitation["trip"]["id"], auth_headers_2, accepted=True)
+
+    assert _summary(client, leader)["acceptedTripInvitations"] == 1
+    assert _summary(client, auth_headers_2)["acceptedTripInvitations"] == 0
+
+
+def test_the_notification_records_who_accepted_and_which_trip(
+    client, trip_with_invitation, auth_headers_2, user_2
+):
+    trip_id = trip_with_invitation["trip"]["id"]
+    _answer_invitation(client, trip_id, auth_headers_2, accepted=True)
+
+    notification = db.session.query(Notification).one()
+    assert notification.kind is NotificationKind.TRIP_INVITATION_ACCEPTED
+    assert notification.actor_id == user_2.id
+    assert str(notification.trip_id) == trip_id
+    assert notification.read_at is None
+
+
+def test_declining_a_trip_invitation_notifies_nobody(client, trip_with_invitation, auth_headers_2):
+    _answer_invitation(client, trip_with_invitation["trip"]["id"], auth_headers_2, accepted=False)
+
+    assert db.session.query(Notification).count() == 0
+    assert _summary(client, trip_with_invitation["leader_headers"])["acceptedTripInvitations"] == 0
+
+
+def test_accepting_a_buddy_request_notifies_the_requester_and_not_the_accepter(
+    client, auth_headers, auth_headers_2, user_2, both_public
+):
+    request_id = _send_buddy_request(client, auth_headers, user_2)
+    assert _summary(client, auth_headers)["acceptedBuddyRequests"] == 0
+
+    accepted = client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+    assert accepted.status_code == 200
+
+    assert _summary(client, auth_headers)["acceptedBuddyRequests"] == 1
+    assert _summary(client, auth_headers_2)["acceptedBuddyRequests"] == 0
+
+
+def test_accepting_a_buddy_request_twice_notifies_once(
+    client, auth_headers, auth_headers_2, user_2, both_public
+):
+    """Accepting is idempotent; the requester must not be told twice."""
+    request_id = _send_buddy_request(client, auth_headers, user_2)
+
+    client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+    client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+
+    assert db.session.query(Notification).count() == 1
+
+
+def test_a_notification_is_gone_with_the_trip_it_is_about(
+    client, trip_with_invitation, auth_headers_2
+):
+    trip_id = trip_with_invitation["trip"]["id"]
+    _answer_invitation(client, trip_id, auth_headers_2, accepted=True)
+    assert db.session.query(Notification).count() == 1
+
+    deleted = client.delete(f"{TRIP_ENDPOINT}/{trip_id}", headers=trip_with_invitation["leader_headers"])
+    assert deleted.status_code == 200
+
+    assert db.session.query(Notification).count() == 0
+
+
+def test_marking_one_kind_read_clears_its_count_and_leaves_the_other(
+    client, trip_with_invitation, auth_headers, auth_headers_2, user_2, both_public
+):
+    request_id = _send_buddy_request(client, auth_headers, user_2)
+    client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+    _answer_invitation(client, trip_with_invitation["trip"]["id"], auth_headers_2, accepted=True)
+    assert _summary(client, auth_headers)["acceptedBuddyRequests"] == 1
+    assert _summary(client, auth_headers)["acceptedTripInvitations"] == 1
+
+    marked = client.post(
+        NOTIFICATIONS_READ,
+        headers=auth_headers,
+        json={"kind": NotificationKind.BUDDY_REQUEST_ACCEPTED.value},
+    )
+
+    assert marked.status_code == 200
+    assert _summary(client, auth_headers)["acceptedBuddyRequests"] == 0
+    assert _summary(client, auth_headers)["acceptedTripInvitations"] == 1
+
+
+def test_marking_read_keeps_the_notification_but_stamps_it(
+    client, auth_headers, auth_headers_2, user_2, both_public
+):
+    request_id = _send_buddy_request(client, auth_headers, user_2)
+    client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+
+    client.post(
+        NOTIFICATIONS_READ,
+        headers=auth_headers,
+        json={"kind": NotificationKind.BUDDY_REQUEST_ACCEPTED.value},
+    )
+
+    notification = db.session.query(Notification).one()
+    assert notification.read_at is not None
+
+
+def test_marking_read_never_touches_another_users_notifications(
+    client, auth_headers, auth_headers_2, user_2, both_public
+):
+    request_id = _send_buddy_request(client, auth_headers, user_2)
+    client.post(f"{CONNECTION_ENDPOINT}/{request_id}/accept", headers=auth_headers_2)
+
+    client.post(
+        NOTIFICATIONS_READ,
+        headers=auth_headers_2,
+        json={"kind": NotificationKind.BUDDY_REQUEST_ACCEPTED.value},
+    )
+
+    assert _summary(client, auth_headers)["acceptedBuddyRequests"] == 1
+
+
+def test_marking_read_rejects_an_unknown_kind(client, auth_headers):
+    response = client.post(NOTIFICATIONS_READ, headers=auth_headers, json={"kind": "nonsense"})
+
+    assert response.status_code == 400
+
+
+def test_marking_read_requires_authentication(client):
+    response = client.post(NOTIFICATIONS_READ, json={"kind": "buddy_request_accepted"})
+
+    assert response.status_code == 401
 
 
 def test_summary_is_scoped_to_the_caller(client, trip_with_invitation, auth_headers):
