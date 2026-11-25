@@ -108,13 +108,13 @@ export default async function PublicFloatPlanPage({
         </div>
 
         {/* Safety notice */}
-        <div className="flex gap-3 rounded-md border border-amber-200/70 bg-amber-50/60 p-4 dark:border-amber-800/40 dark:bg-amber-950/20">
-          <AnchorIcon className="text-accent mt-0.5 size-4 shrink-0" />
+        <div className="border-notice-border bg-notice-bg text-notice-ink flex gap-3 rounded-md border p-4">
+          <AnchorIcon className="mt-0.5 size-4 shrink-0" />
           <div className="flex flex-col gap-1">
-            <p className="text-accent text-xs font-semibold tracking-wide uppercase">
+            <p className="text-xs font-semibold tracking-wide uppercase">
               Instructions for shore contact
             </p>
-            <p className="text-sm leading-relaxed text-amber-900/90 dark:text-amber-200/90">
+            <p className="text-sm leading-relaxed">
               If the expedition party has not returned or made contact by the expected return date
               and you are unable to reach them, contact the relevant local emergency services and
               provide the vessel descriptions and emergency contacts listed in this document.
