@@ -2,9 +2,9 @@ import type { LivePosition } from "@shared/dtos/live-position"
 
 import { formatAge } from "./position/sharing-status"
 
-// A crew member not heard from for this long is drawn quieter. Web's live layer uses the same ten
-// minutes (`STALE_AFTER_MINUTES`, frontend/components/map/live-position-layer.tsx). A phone that is
-// standing still sends nothing by design, so "quiet" means "ask", never "in trouble".
+// A crew member not heard from for this long is drawn hollow with a dashed ring. Web's live layer
+// uses the same ten minutes (`STALE_AFTER_MINUTES`, frontend/components/map/live-position-layer.tsx).
+// A phone that is standing still sends nothing by design, so "quiet" means "ask", never "in trouble".
 export const STALE_AFTER_MS = 10 * 60_000
 
 export type CrewMarkerLabel = { text: string; stale: boolean }

@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react-native"
 
 import type { LivePosition } from "@shared/dtos/live-position"
+import { palette } from "@shared/tokens"
 
 import { useIsFocused } from "expo-router"
 
@@ -85,20 +86,45 @@ describe("CrewPositionMarkers", () => {
     expect(screen.getByText(crewMarkerLabel(ada, NOW).text)).toBeTruthy()
   })
 
-  it("draws a member not heard from for a while quieter than one who was", async () => {
-    jest.mocked(useCrewPositions).mockReturnValue([
-      crew("fresh", "Ada Paddler", 1),
-      crew("quiet", "Bea Paddler", STALE_AFTER_MS / 60_000 + 1),
-    ])
-
-    await render(<CrewPositionMarkers tripId="trip-1" live />)
-
-    const opacityOf = (userId: string) => {
+  // "Last known, not live" is told apart by shape, not by fading: a faded dot is lost against a
+  // busy chart. A member not heard from for a while is hollow (pale centre) with a dashed ring,
+  // fully opaque, beside a solid filled dot for one who was.
+  describe("a member not heard from for a while", () => {
+    function dotStyle(userId: string): Record<string, unknown> {
       const style = screen.getByTestId(`crew-dot-${userId}`).props.style
-      return [style].flat().reduce((found: number | undefined, entry) => entry?.opacity ?? found, undefined)
+      return Object.assign({}, ...[style].flat().filter(Boolean))
     }
-    expect(opacityOf("fresh")).toBe(1)
-    expect(opacityOf("quiet")).toBeLessThan(opacityOf("fresh") as number)
+
+    beforeEach(() => {
+      jest.mocked(useCrewPositions).mockReturnValue([
+        crew("fresh", "Ada Paddler", 1),
+        crew("quiet", "Bea Paddler", STALE_AFTER_MS / 60_000 + 1),
+      ])
+    })
+
+    it("is hollow with a dashed ring, where a recent one is solid", async () => {
+      await render(<CrewPositionMarkers tripId="trip-1" live />)
+
+      expect(dotStyle("fresh").backgroundColor).toBe(palette.foam400)
+      expect(dotStyle("fresh").borderStyle).toBe("solid")
+      expect(dotStyle("quiet").backgroundColor).toBe(palette.foam100)
+      expect(dotStyle("quiet").borderStyle).toBe("dashed")
+    })
+
+    it("is not faded: it keeps its ink ring and full opacity", async () => {
+      await render(<CrewPositionMarkers tripId="trip-1" live />)
+
+      expect(dotStyle("quiet").opacity).toBeUndefined()
+      expect(dotStyle("quiet").borderColor).toBe(palette.ocean900)
+      expect(dotStyle("fresh").opacity).toBeUndefined()
+    })
+
+    it("keeps the same size, so only the style says it is old", async () => {
+      await render(<CrewPositionMarkers tripId="trip-1" live />)
+
+      expect(dotStyle("quiet").width).toBe(dotStyle("fresh").width)
+      expect(dotStyle("quiet").height).toBe(dotStyle("fresh").height)
+    })
   })
 
   it("does not draw the signed-in paddler as crew: their own marker comes from the phone's own fix", async () => {
