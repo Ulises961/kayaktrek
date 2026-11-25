@@ -20,7 +20,7 @@ const COPY: Record<PositionSource, { title: string; description: string }> = {
   [POSITION_SOURCE.DEVICE]: {
     title: "Share your live position?",
     description:
-      "While Navigate is on, your device’s location is shared with the other members of this trip and, if a float plan link has been shared, with the shore contact. It stops the moment you turn Navigate off.",
+      "While you are sharing, your device’s location is shared with the other members of this trip and, if a float plan link has been shared, with the shore contact. It stops the moment you stop sharing or turn Navigate off. You can watch the crew without sharing.",
   },
   [POSITION_SOURCE.INREACH]: {
     title: "Share your inReach position?",
