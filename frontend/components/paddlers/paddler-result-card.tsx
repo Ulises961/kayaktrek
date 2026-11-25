@@ -38,12 +38,21 @@ interface PaddlerResultCardProps {
 // menu carrying Block. The relationship is tracked locally so the action flips
 // immediately (the finder's results are client state a server refresh won't
 // re-fetch); we also refresh so the server-rendered Buddies/Blocked tabs stay in
-// sync. A successful block hides the card outright — you no longer see them.
+// sync, and the hub passes the relationship back down as the connections change.
+// A successful block hides the card outright — you no longer see them.
 export function PaddlerResultCard({ paddler }: PaddlerResultCardProps) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [relationship, setRelationship] = useState<Relationship>(paddler.relationship)
+  // The parent re-derives the relationship as the connections change (a request accepted, or
+  // withdrawn, elsewhere), and that is newer than the value this card started with. An action's
+  // own flip still stands until the prop actually changes.
+  const [seenRelationship, setSeenRelationship] = useState<Relationship>(paddler.relationship)
+  if (paddler.relationship !== seenRelationship) {
+    setSeenRelationship(paddler.relationship)
+    setRelationship(paddler.relationship)
+  }
   const [hidden, setHidden] = useState(false)
 
   const fullName = formatPaddlerName(paddler)

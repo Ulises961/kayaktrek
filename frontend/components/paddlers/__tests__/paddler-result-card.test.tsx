@@ -43,6 +43,32 @@ describe("PaddlerResultCard", () => {
     expect(await screen.findByRole("button", { name: /pending/i })).toBeDefined()
   })
 
+  // The card copies its relationship into state so an action can flip it at once. It must still
+  // follow the prop, or a result drawn while pending stays pending after the other side accepts.
+  it("follows its relationship when the parent changes it, instead of keeping its first value", () => {
+    const { rerender } = render(
+      <PaddlerResultCard paddler={{ ...BASE, relationship: "pending_outgoing" }} />,
+    )
+    expect(screen.getByRole("button", { name: /pending/i })).toBeInTheDocument()
+
+    rerender(<PaddlerResultCard paddler={{ ...BASE, relationship: "buddy" }} />)
+
+    expect(screen.getByRole("button", { name: /already buddies/i })).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: /^pending$/i })).not.toBeInTheDocument()
+  })
+
+  it("keeps the local flip after an action until its relationship actually changes", async () => {
+    vi.mocked(requestConnection).mockResolvedValue({ success: true })
+    const { rerender } = render(<PaddlerResultCard paddler={BASE} />)
+    await userEvent.click(screen.getByRole("button", { name: /add buddy/i }))
+    expect(await screen.findByRole("button", { name: /pending/i })).toBeInTheDocument()
+
+    // A refresh that re-renders with the same prop (nothing has changed on the server yet).
+    rerender(<PaddlerResultCard paddler={{ ...BASE }} />)
+
+    expect(screen.getByRole("button", { name: /pending/i })).toBeInTheDocument()
+  })
+
   it("renders a disabled Pending button for an outgoing request", () => {
     render(<PaddlerResultCard paddler={{ ...BASE, relationship: "pending_outgoing" }} />)
     const button = screen.getByRole("button", { name: /pending/i })

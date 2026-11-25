@@ -13,6 +13,7 @@ import { BuddiesList } from "./buddies-list"
 import { BlockedList } from "./blocked-list"
 import { PaddlerResultCard } from "./paddler-result-card"
 import { searchPaddlers } from "@/lib/connections/actions"
+import { relationshipWith } from "@/lib/connections/relationship"
 import { useDebouncedValue } from "@/lib/utils/debounce"
 import type { Connection } from "@/lib/dtos/connection"
 import type { Block } from "@/lib/dtos/block"
@@ -108,8 +109,17 @@ export function PaddlersHub({
             <EmptyState variant="inline" title="No paddlers found." />
           ) : (
             <div className="flex flex-col">
+              {/* The results are a snapshot from when the search ran, so each one's status is
+                  read from the connections the page re-reads, which keep up when a request is
+                  accepted or withdrawn. */}
               {communityResults.map((paddler) => (
-                <PaddlerResultCard key={paddler.id} paddler={paddler} />
+                <PaddlerResultCard
+                  key={paddler.id}
+                  paddler={{
+                    ...paddler,
+                    ...relationshipWith(paddler.id, connections, currentUserId),
+                  }}
+                />
               ))}
             </div>
           )}
