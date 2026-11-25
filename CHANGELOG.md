@@ -7,6 +7,33 @@ All notable changes to this project are documented here. The format is based on
 A version here means a git tag, which is the only thing that publishes images — see
 `DEPLOY.md`. Tagging does not deploy; deploying is a separate manual step.
 
+## [1.6.2] - 2026-11-25
+
+A security and dependency release. No feature changes.
+
+### Security
+
+- **Old TLS versions are refused.** The web server still accepted TLS 1.0 and 1.1, which Ubuntu's
+  default configuration leaves on. Every site now requires TLS 1.2 or newer.
+- **A vulnerable URL-parsing library in the web app is replaced.** Five advisories in `fast-uri`,
+  which the form validation pulls in, are closed by moving to 3.1.9.
+- **The backend's dependencies are current.** The template engine used by database migrations
+  (Mako) moves to 1.4.3, closing a path-traversal advisory that affected Windows only. The
+  HTTP server (gunicorn) moves to 27 and the telemetry library (Logfire) to 5.6, along with
+  routine updates to the AWS client and the API documentation page.
+
+### Deploy notes
+
+- **nginx is not part of the automated push.** The TLS change reaches the box only when the
+  template is installed by hand and reloaded: follow "Deploying configuration to the box" in
+  `DEPLOY.md`, then `sudo nginx -t && sudo systemctl reload nginx`. Until then the release is
+  otherwise complete and the old TLS versions stay accepted.
+- **gunicorn 27 parses requests more strictly.** It answers 400 to a request with a malformed
+  `Transfer-Encoding`, whitespace before a header colon, or control characters in the path.
+  nginx sits in front and sends well-formed requests, so none is expected; after deploying,
+  sign in, open a trip, and check that the live position stream connects.
+- No migration, no new environment variable, no forced logout.
+
 ## [1.6.1] - 2026-11-15
 
 ### Fixed
