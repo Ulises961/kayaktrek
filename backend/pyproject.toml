@@ -11,7 +11,7 @@ dependencies = [
     "flask-sqlalchemy>=3.1.0",
     # Below 2.1: from 2.1 a plain `postgresql://` URL means psycopg 3, but this app ships
     # psycopg2-binary and every deployed DATABASE_URL is a plain `postgresql://`.
-    "sqlalchemy>=2.0.0,<2.1",
+    "sqlalchemy>=2.0.58,<2.1",
     "psycopg2-binary",
     "flask-bcrypt",
     "python-dotenv",
@@ -44,7 +44,7 @@ dependencies = [
     "logfire[celery,flask,requests,sqlalchemy]>=5.4.0",
     "apispec>=6.10.1",
     "apispec-webframeworks>=1.2.0",
-    "flask-swagger-ui>=5.34.1",
+    "flask-swagger-ui>=5.35.0",
 ]
 
 [dependency-groups]
