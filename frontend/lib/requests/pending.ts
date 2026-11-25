@@ -42,8 +42,12 @@ export function badgeTotal(summary: PendingRequestsSummary): number {
 // as well as the badge, so the header refreshes the page when it is on one of them.
 const REQUEST_LISTING_PAGES = ["/dashboard", "/invitations", "/paddlers", "/logs"]
 
+// A trip's Crew tab lists the invitations still pending on it, which an acceptance removes.
+const TRIP_CREW_PAGE = /^\/trips\/[^/]+\/crew\/?$/
+
 export function listsPendingRequests(pathname: string | null): boolean {
   if (!pathname) return false
+  if (TRIP_CREW_PAGE.test(pathname)) return true
   return REQUEST_LISTING_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))
 }
 

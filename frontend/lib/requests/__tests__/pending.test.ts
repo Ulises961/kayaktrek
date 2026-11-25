@@ -65,6 +65,18 @@ describe("listsPendingRequests", () => {
     },
   )
 
+  // A trip's Crew tab lists its pending invitations, which is exactly what an acceptance removes.
+  it("is true for a trip's crew page, where its pending invitations are listed", () => {
+    expect(listsPendingRequests("/trips/01952f1a-0000-7000-8000-000000000001/crew")).toBe(true)
+    expect(listsPendingRequests("/trips/abc/crew/")).toBe(true)
+  })
+
+  it("is false for the trip's other tabs, which list no invitations", () => {
+    expect(listsPendingRequests("/trips/abc/items")).toBe(false)
+    expect(listsPendingRequests("/trips/abc/logistics")).toBe(false)
+    expect(listsPendingRequests("/trips/abc")).toBe(false)
+  })
+
   it("is false for a page that lists none, including one that only shares a prefix", () => {
     expect(listsPendingRequests("/trips/abc")).toBe(false)
     expect(listsPendingRequests("/paddlers-hub")).toBe(false)

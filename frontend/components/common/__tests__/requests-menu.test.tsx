@@ -97,6 +97,19 @@ describe("RequestsMenu — live badge", () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1)
   })
 
+  // The inviter is on the trip's Crew tab with the invitee still listed as pending. The
+  // acceptance arrives as a notification, and the page has to reload so the entry goes.
+  it("refreshes a trip's crew page when an invitation to it is accepted", async () => {
+    mockPathname.mockReturnValue("/trips/abc/crew")
+    mockPoll.mockResolvedValue(counts({ acceptedTripInvitations: 1 }))
+    renderMenu({})
+
+    await pollOnce()
+
+    expect(screen.getByText("1")).toBeInTheDocument()
+    expect(mockRefresh).toHaveBeenCalledTimes(1)
+  })
+
   it("counts answers to the user's own requests in the badge with what is waiting on them", () => {
     renderMenu({ tripInvitations: 1, acceptedTripInvitations: 2, acceptedBuddyRequests: 1 })
 
