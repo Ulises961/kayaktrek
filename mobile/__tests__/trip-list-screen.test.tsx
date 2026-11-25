@@ -72,6 +72,28 @@ describe("TripListScreen", () => {
     expect(await findByText("No trips yet")).toBeTruthy()
   })
 
+  it("offers to create a trip from the empty state, and the button is live", async () => {
+    mockGetTrips.mockResolvedValue({ items: [], total: 0, page: 1, pages: 0 })
+
+    const { findByTestId } = await render(<TripListScreen />, { wrapper: WithCachedSurfaces })
+
+    const button = await findByTestId("trip-new-empty")
+    expect(button.props.accessibilityState?.disabled).not.toBe(true)
+  })
+
+  it("offers a New trip button above a list that already has trips", async () => {
+    mockGetTrips.mockResolvedValue({
+      items: [{ id: "t1", destination: "Costa Brava", state: "building", dateFrom: null, dateTo: null }],
+      total: 1,
+      page: 1,
+      pages: 1,
+    })
+
+    const { findByTestId } = await render(<TripListScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByTestId("trip-new")).toBeTruthy()
+  })
+
   it("surfaces the thrown error message and offers a retry that re-fetches, when there is no cache to fall back to", async () => {
     mockGetTrips.mockRejectedValueOnce(new Error("Could not reach the server."))
     mockGetTrips.mockResolvedValueOnce({ items: [], total: 0, page: 1, pages: 0 })

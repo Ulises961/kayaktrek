@@ -15,6 +15,7 @@ import { TRIP_STATE, type Trip, type TripState } from "@shared/dtos/trip"
 import { palette } from "@shared/tokens"
 import { formatDateRange } from "@shared/trips/format"
 
+import { StartTripCard } from "@mobile/components/trips/start-trip-card"
 import { TripControls } from "@mobile/components/trips/trip-controls"
 import { Card, CardContent } from "@mobile/components/ui/card"
 import { Row, Screen, Stack } from "@mobile/components/ui/layout"
@@ -189,6 +190,10 @@ export default function TripDetailScreen() {
             )}
           </CardContent>
         </Card>
+
+        {isLeader && (
+          <StartTripCard tripId={id} state={trip.state} onStarted={() => void reload()} />
+        )}
 
         {isLeader && (
           <TripControls

@@ -1,4 +1,4 @@
-import { Stack as RouterStack } from "expo-router"
+import { Link, Stack as RouterStack } from "expo-router"
 import { DrawerToggleButton } from "expo-router/drawer"
 import { Kayak } from "lucide-react-native"
 import { useCallback, useEffect, useState } from "react"
@@ -109,17 +109,13 @@ export default function TripListScreen() {
           className="mt-4"
           icon={Kayak}
           title="No trips yet"
-          description="Trips you plan on the web appear here — the itinerary builder is desktop-only for now."
+          description="Plan one here, or on the web. Trips you plan anywhere appear in this list."
           action={
-            // Disabled rather than wired to a stand-in destination: the mobile
-            // itinerary builder (create-a-trip) doesn't exist yet, and a CTA that
-            // silently no-ops on tap reads as broken. Web parity for "create/explore
-            // itineraries" is real, separate work (M9's own scope note on map-based
-            // building staying web-only, and the still-unbuilt Explore screen); this
-            // is a placeholder for the day either lands, not a stand-in for one.
-            <Button variant="cta" disabled>
-              Create a trip
-            </Button>
+            <Link href="/trips/new" asChild>
+              <Button variant="cta" testID="trip-new-empty">
+                Create a trip
+              </Button>
+            </Link>
           }
         />
       </Screen>
@@ -142,6 +138,11 @@ export default function TripListScreen() {
           <RefreshControl refreshing={isRefreshing} onRefresh={() => void load(true)} />
         }
       >
+        <Link href="/trips/new" asChild>
+          <Button variant="cta" testID="trip-new">
+            New trip
+          </Button>
+        </Link>
         {groupTrips(trips ?? []).map((group) => (
           <Stack key={group.state} className="gap-3">
             <SectionLabel testID={`group-${group.state}`}>{group.title}</SectionLabel>

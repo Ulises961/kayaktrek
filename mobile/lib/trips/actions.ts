@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { TripSchema, type Trip } from "@shared/dtos/trip"
+import { TRIP_STATE, TripFieldsSchema, TripSchema, type Trip, type TripFields } from "@shared/dtos/trip"
 import { LogisticsSchema, type Logistics } from "@shared/dtos/logistics"
 
 import { apiDelete, apiGet, apiPost } from "../api/client"
@@ -32,6 +32,25 @@ export async function getTrips(): Promise<TripsPage> {
 export async function getTrip(id: string): Promise<Trip> {
   const raw = await apiGet<unknown>(`/api/trip/${id}`)
   return TripSchema.parse(raw)
+}
+
+// POST /api/v1/trip/create (backend/Resources/trip_resource.py) — network-only, like web's
+// createTrip. The caller becomes the trip's leader and the backend creates its empty
+// itinerary, so the itinerary editor (M42) works on the new trip straight away.
+// `TripFieldsSchema` is web's own form schema (lengths, no HTML tags, ISO dates, end on or
+// after start), so a bad field fails here with web's message rather than as a server 400.
+export async function createTrip(fields: TripFields): Promise<string> {
+  const body = TripFieldsSchema.parse(fields)
+  const created = await apiPost<{ id: string }>("/api/trip/create", body)
+  return created.id
+}
+
+// POST /api/v1/trip/<id>/state — the leader's forward-only transition, online-only on
+// purpose (docs/adr/mobile-offline.md: the ADR keeps the state change itself off the offline
+// queue, and starting is the moment the missed-checkpoint alert arms, so the server must
+// have actually heard it). The server's own reason for a refusal travels in the message.
+export async function startTrip(tripId: string): Promise<void> {
+  await apiPost(`/api/trip/${tripId}/state`, { state: TRIP_STATE.HAPPENING })
 }
 
 // GET /api/v1/logistics/<tripId> — shore contact for the float plan (WP6). Returns
