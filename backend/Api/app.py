@@ -46,6 +46,7 @@ from Resources.place_resource import place_api
 from Resources.connection_resource import connection_api
 from Resources.block_resource import block_api
 from Resources.endorsement_request_resource import endorsement_request_api
+from Resources.pending_requests_resource import pending_requests_api
 from Resources.dev_resource import dev_api
 from Resources.health_resource import health_api
 from Resources.tile_resource import tile_api
@@ -125,6 +126,7 @@ def createApp(config_mode: str, *, schema: str | None = None) -> Flask:
     app.register_blueprint(connection_api)
     app.register_blueprint(block_api)
     app.register_blueprint(endorsement_request_api)
+    app.register_blueprint(pending_requests_api)
     app.register_blueprint(dev_api)
     app.register_blueprint(health_api)
     app.register_blueprint(tile_api)
