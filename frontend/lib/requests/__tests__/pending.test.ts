@@ -1,49 +1,22 @@
 import { describe, it, expect } from "vitest"
-import { summarizePending, buildPendingRequestRows } from "../pending"
-import type { Trip } from "@/lib/dtos/trip"
-import type { Connection } from "@/lib/dtos/connection"
-import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
+import { buildPendingRequestRows, listsPendingRequests } from "../pending"
 
-const CURRENT_USER_ID = "01952f1a-0000-7000-8000-000000000001"
-const OTHER_USER_ID = "01952f1a-0000-7000-8000-000000000002"
+describe("listsPendingRequests", () => {
+  it.each(["/dashboard", "/invitations", "/paddlers", "/logs"])(
+    "is true for %s, where the requests are listed",
+    (path) => {
+      expect(listsPendingRequests(path)).toBe(true)
+    },
+  )
 
-const invitation = (id: string): Trip => ({ id, destination: "Fjords" }) as Trip
-
-const connection = (status: "pending" | "accepted", addresseeId: string): Connection =>
-  ({
-    id: `conn-${addresseeId}`,
-    status,
-    requester: { id: OTHER_USER_ID, username: "other", name: "Other" },
-    addressee: { id: addresseeId, username: "me", name: "Me" },
-  }) as Connection
-
-const endorsementRequest = (id: string): EndorsementRequest => ({ id }) as EndorsementRequest
-
-describe("summarizePending", () => {
-  it("counts trip invitations and endorsement requests directly", () => {
-    const result = summarizePending(
-      [invitation("t1"), invitation("t2")],
-      [],
-      [endorsementRequest("e1")],
-      CURRENT_USER_ID,
-    )
-    expect(result.tripInvitations).toBe(2)
-    expect(result.endorsementRequests).toBe(1)
+  it("is false for a page that lists none, including one that only shares a prefix", () => {
+    expect(listsPendingRequests("/trips/abc")).toBe(false)
+    expect(listsPendingRequests("/paddlers-hub")).toBe(false)
+    expect(listsPendingRequests(null)).toBe(false)
   })
 
-  it("counts only connections where the current user is the addressee", () => {
-    const connections = [
-      connection("pending", CURRENT_USER_ID),
-      connection("pending", CURRENT_USER_ID),
-      connection("pending", OTHER_USER_ID), // outgoing — caller sent this one
-    ]
-    const result = summarizePending([], connections, [], CURRENT_USER_ID)
-    expect(result.buddyRequests).toBe(2)
-  })
-
-  it("returns all zeros for empty inputs", () => {
-    const result = summarizePending([], [], [], CURRENT_USER_ID)
-    expect(result).toEqual({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+  it("is true below a listing page too", () => {
+    expect(listsPendingRequests("/logs/abc")).toBe(true)
   })
 })
 

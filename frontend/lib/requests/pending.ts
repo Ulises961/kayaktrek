@@ -1,6 +1,4 @@
-import type { Trip } from "@/lib/dtos/trip"
-import type { Connection } from "@/lib/dtos/connection"
-import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
+import type { PendingRequestsSummary } from "@/lib/dtos/pending-requests"
 
 // Pure logic only — no "server-only" fetch/session plumbing here, so this
 // module is safe to import from client components too (the sidebar
@@ -8,11 +6,7 @@ import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
 // fetch lives in lib/requests/actions.ts, which imports this file, never the
 // other way around.
 
-export interface PendingRequestsSummary {
-  tripInvitations: number
-  buddyRequests: number
-  endorsementRequests: number
-}
+export type { PendingRequestsSummary }
 
 export const EMPTY_PENDING_SUMMARY: PendingRequestsSummary = {
   tripInvitations: 0,
@@ -20,20 +14,13 @@ export const EMPTY_PENDING_SUMMARY: PendingRequestsSummary = {
   endorsementRequests: 0,
 }
 
-// `connections` is expected already status-filtered to "pending" (both
-// incoming and outgoing) — only rows addressed to `currentUserId` count as
-// incoming.
-export function summarizePending(
-  invitations: Trip[],
-  connections: Connection[],
-  endorsements: EndorsementRequest[],
-  currentUserId: string,
-): PendingRequestsSummary {
-  return {
-    tripInvitations: invitations.length,
-    buddyRequests: connections.filter((c) => c.addressee.id === currentUserId).length,
-    endorsementRequests: endorsements.length,
-  }
+// The pages that list the requests the badge counts. A change in the counts has to reach these
+// as well as the badge, so the header refreshes the page when it is on one of them.
+const REQUEST_LISTING_PAGES = ["/dashboard", "/invitations", "/paddlers", "/logs"]
+
+export function listsPendingRequests(pathname: string | null): boolean {
+  if (!pathname) return false
+  return REQUEST_LISTING_PAGES.some((page) => pathname === page || pathname.startsWith(`${page}/`))
 }
 
 export interface PendingRequestRow {

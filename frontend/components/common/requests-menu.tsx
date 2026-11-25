@@ -1,7 +1,10 @@
 "use client"
 
+import { useCallback } from "react"
 import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
 import { BellIcon } from "lucide-react"
+import { usePendingRequests } from "@/hooks/use-pending-requests"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -9,7 +12,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { buildPendingRequestRows, type PendingRequestsSummary } from "@/lib/requests/pending"
+import {
+  buildPendingRequestRows,
+  listsPendingRequests,
+  type PendingRequestsSummary,
+} from "@/lib/requests/pending"
 
 interface RequestsMenuProps {
   pendingRequests: PendingRequestsSummary
@@ -20,13 +27,18 @@ interface RequestsMenuProps {
 // invitations, incoming buddy requests, incoming endorsement asks) into one
 // entry that routes each item to where it's actually handled (/invitations,
 // /paddlers, /logs), rather than giving only trip invitations a dedicated
-// sidebar slot.
+// sidebar slot. The counts are kept current by polling (usePendingRequests), and when they
+// change on a page that lists the requests themselves, that page is refreshed too.
 export function RequestsMenu({ pendingRequests }: RequestsMenuProps) {
-  const rows = buildPendingRequestRows(pendingRequests)
-  const total =
-    pendingRequests.tripInvitations +
-    pendingRequests.buddyRequests +
-    pendingRequests.endorsementRequests
+  const router = useRouter()
+  const pathname = usePathname()
+  const refreshListing = useCallback(() => {
+    if (listsPendingRequests(pathname)) router.refresh()
+  }, [pathname, router])
+  const summary = usePendingRequests(pendingRequests, refreshListing)
+
+  const rows = buildPendingRequestRows(summary)
+  const total = summary.tripInvitations + summary.buddyRequests + summary.endorsementRequests
 
   return (
     <DropdownMenu>
