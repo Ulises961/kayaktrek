@@ -44,7 +44,7 @@ dependencies = [
     "logfire[celery,flask,requests,sqlalchemy]>=5.4.0",
     "apispec>=6.10.1",
     "apispec-webframeworks>=1.2.0",
-    "flask-swagger-ui>=5.34.1",
+    "flask-swagger-ui>=5.35.0",
 ]
 
 [dependency-groups]
