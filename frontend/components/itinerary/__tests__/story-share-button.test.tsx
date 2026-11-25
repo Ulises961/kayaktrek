@@ -36,21 +36,36 @@ describe("StoryShareButton — no token yet", () => {
     expect(screen.getByRole("button", { name: /share story/i })).toBeInTheDocument()
   })
 
-  it("generates a link on click and opens the dialog with it", async () => {
+  // Making a story public is its own act: opening the dialog only offers it.
+  it("opens the dialog without creating a link", async () => {
+    render(<StoryShareButton itinerary={NO_TOKEN} />)
+    await userEvent.click(screen.getByRole("button", { name: /share story/i }))
+
+    expect(await screen.findByRole("dialog", { name: /share trip story/i })).toBeInTheDocument()
+    expect(generateStoryShare).not.toHaveBeenCalled()
+    expect(screen.getByRole("button", { name: /create link/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /copy link/i })).toBeDisabled()
+  })
+
+  it("creates the link on request and shows it", async () => {
     vi.mocked(generateStoryShare).mockResolvedValue({
       success: true,
       itinerary: WITH_TOKEN,
     })
     render(<StoryShareButton itinerary={NO_TOKEN} />)
     await userEvent.click(screen.getByRole("button", { name: /share story/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create link/i }))
+
     await waitFor(() => expect(generateStoryShare).toHaveBeenCalledWith(ITINERARY_ID))
     await waitFor(() => expect(screen.getByText(/tok_abc123/)).toBeInTheDocument())
+    expect(screen.queryByRole("button", { name: /create link/i })).not.toBeInTheDocument()
   })
 
   it("shows an error when generation fails", async () => {
     vi.mocked(generateStoryShare).mockResolvedValue({ success: false, error: "Server error." })
     render(<StoryShareButton itinerary={NO_TOKEN} />)
     await userEvent.click(screen.getByRole("button", { name: /share story/i }))
+    await userEvent.click(screen.getByRole("button", { name: /create link/i }))
     await waitFor(() => expect(screen.getByText("Server error.")).toBeInTheDocument())
   })
 })

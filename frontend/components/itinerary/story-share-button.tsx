@@ -14,43 +14,26 @@ import {
 import { generateStoryShare } from "@/lib/itinerary/actions"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 
-type StoryShareButtonProps = {
+type StoryShareDialogProps = {
   itinerary: Itinerary
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }
 
 function buildStoryUrl(token: string): string {
   return `${window.location.origin}/story/${token}`
 }
 
-// Trip narrative share (M7d) — generates/shows the unlisted story link for an
-// itinerary. Sits alongside the public/private toggle in ItineraryCard's action
-// row: closely related sharing controls, one existing home.
-export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
+// Trip narrative share (M7d) — shows the unlisted story link for an itinerary and, when there
+// is none, offers to create it. Making a story public is its own act, so opening this dialog
+// never creates a link by itself. Controlled, so it can be opened from the itinerary card's
+// button or from the trip's actions menu.
+export function StoryShareDialog({ itinerary, open, onOpenChange }: StoryShareDialogProps) {
   const [token, setToken] = useState(itinerary.storyShareToken ?? null)
-  const [open, setOpen] = useState(false)
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const [copied, setCopied] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-
-  function handleOpen(e: React.MouseEvent) {
-    e.preventDefault()
-    setError(null)
-    if (token) {
-      setOpen(true)
-      return
-    }
-    startTransition(async () => {
-      const result = await generateStoryShare(itinerary.id ?? "")
-      if (result.success) {
-        setToken(result.itinerary.storyShareToken ?? null)
-      } else {
-        setError(result.error)
-      }
-      // Open either way — on failure this is what surfaces the error message.
-      setOpen(true)
-    })
-  }
 
   async function handleCopy() {
     if (!token) return
@@ -66,7 +49,8 @@ export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
     setTimeout(() => setCopied(false), 2000)
   }
 
-  function handleRegenerate() {
+  // Creates the first link, or replaces the existing one (which invalidates the old).
+  function handleGenerate() {
     setShowRegenerateConfirm(false)
     setError(null)
     startTransition(async () => {
@@ -82,16 +66,7 @@ export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
 
   return (
     <>
-      <button
-        onClick={handleOpen}
-        disabled={isPending}
-        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors disabled:opacity-50"
-      >
-        <Share2Icon className="size-3" />
-        <span>{isPending ? "Generating…" : "Share story"}</span>
-      </button>
-
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Share trip story</DialogTitle>
@@ -111,14 +86,20 @@ export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
               {copied ? <CheckIcon className="size-3.5" /> : <LinkIcon className="size-3.5" />}
               {copied ? "Copied!" : "Copy link"}
             </Button>
-            <Button
-              variant="ghost"
-              onClick={() => setShowRegenerateConfirm(true)}
-              disabled={isPending}
-            >
-              <RefreshCwIcon className="size-3.5" />
-              Regenerate
-            </Button>
+            {token ? (
+              <Button
+                variant="ghost"
+                onClick={() => setShowRegenerateConfirm(true)}
+                disabled={isPending}
+              >
+                <RefreshCwIcon className="size-3.5" />
+                Regenerate
+              </Button>
+            ) : (
+              <Button onClick={handleGenerate} disabled={isPending}>
+                {isPending ? "Creating…" : "Create link"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -136,12 +117,34 @@ export function StoryShareButton({ itinerary }: StoryShareButtonProps) {
             <Button variant="outline" onClick={() => setShowRegenerateConfirm(false)}>
               Cancel
             </Button>
-            <Button onClick={handleRegenerate} disabled={isPending}>
+            <Button onClick={handleGenerate} disabled={isPending}>
               {isPending ? "Regenerating…" : "Confirm"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  )
+}
+
+// The itinerary card's trigger, sitting beside the public/private toggle: closely related
+// sharing controls, one existing home.
+export function StoryShareButton({ itinerary }: { itinerary: Itinerary }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.preventDefault()
+          setOpen(true)
+        }}
+        className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-xs transition-colors"
+      >
+        <Share2Icon className="size-3" />
+        <span>Share story</span>
+      </button>
+      <StoryShareDialog itinerary={itinerary} open={open} onOpenChange={setOpen} />
     </>
   )
 }

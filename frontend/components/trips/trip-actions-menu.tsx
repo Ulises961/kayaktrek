@@ -8,6 +8,7 @@ import {
   PauseIcon,
   PencilIcon,
   PlayIcon,
+  Share2Icon,
   Trash2Icon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -19,13 +20,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { AdvanceStateDialog, nextStateStep } from "@/components/trips/advance-state-dialog"
+import { StoryShareDialog } from "@/components/itinerary/story-share-button"
 import { EditTripDialog } from "@/components/trips/edit-trip-dialog"
 import { PauseTripDialog } from "@/components/trips/pause-controls"
 import { LeaveTripDialog } from "@/components/trips/leave-trip-dialog"
 import { DeleteTripDialog } from "@/components/trips/delete-trip-dialog"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 
-type MenuDialog = "advance" | "edit" | "pause" | "leave" | "delete"
+type MenuDialog = "advance" | "edit" | "story" | "pause" | "leave" | "delete"
 
 interface TripActionsMenuProps {
   trip: Trip
@@ -44,6 +46,8 @@ export function TripActionsMenu({ trip, isLeader, isMember }: TripActionsMenuPro
   // Three groups, in this order: where the trip goes next, editing it, and ending one's part
   // in it. Everyone but the leader has Leave alone.
   const hasStateItems = !!nextStep || canPause
+  const itinerary = trip.itinerary
+  const canShareStory = isLeader && !!itinerary?.id
   const hasEditItems = isLeader
   const hasExitItems = isMember || isLeader
 
@@ -88,6 +92,12 @@ export function TripActionsMenu({ trip, isLeader, isMember }: TripActionsMenuPro
               Edit trip
             </DropdownMenuItem>
           )}
+          {canShareStory && (
+            <DropdownMenuItem onSelect={() => setDialog("story")}>
+              <Share2Icon />
+              Share story
+            </DropdownMenuItem>
+          )}
           {hasEditItems && hasExitItems && <DropdownMenuSeparator />}
 
           {isMember && (
@@ -115,6 +125,13 @@ export function TripActionsMenu({ trip, isLeader, isMember }: TripActionsMenuPro
       )}
       {isLeader && (
         <EditTripDialog trip={trip} open={dialog === "edit"} onOpenChange={closeDialog} />
+      )}
+      {canShareStory && itinerary && (
+        <StoryShareDialog
+          itinerary={itinerary}
+          open={dialog === "story"}
+          onOpenChange={closeDialog}
+        />
       )}
       {isLeader && (
         <PauseTripDialog tripId={tripId} open={dialog === "pause"} onOpenChange={closeDialog} />
