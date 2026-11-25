@@ -5,6 +5,14 @@ updates:
     directory: "/backend"
     schedule:
       interval: "weekly"
+    ignore:
+      # pyproject.toml caps sqlalchemy below 2.1 on purpose: from 2.1 a plain
+      # `postgresql://` URL selects psycopg 3, and this app ships psycopg2-binary with
+      # plain URLs everywhere. Dependabot counts 2.0 -> 2.1 as a minor, so the grouped PR
+      # rewrote the cap itself (#29) and every backend test died on "No module named
+      # psycopg". Lift this together with the driver, not by accepting a bump.
+      - dependency-name: "sqlalchemy"
+        versions: [">=2.1"]
     groups:
       # One PR per weekly run instead of one per package. The backend suite is
       # the gate either way, so a single PR means a single CI run to read.
