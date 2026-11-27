@@ -1,5 +1,6 @@
 import { type PushResult, registerPushRetry, setPushStatus } from "../network/push-status"
 import { pushQueuedMutations } from "./mutation-queue"
+import { pushBufferedPings } from "./position-buffer"
 import { pushRouteChanges, tripsWithRouteChanges } from "./route-edit"
 
 // The one way anything on this phone gets sent (M9d follow-up). Edits used to
@@ -7,7 +8,8 @@ import { pushRouteChanges, tripsWithRouteChanges } from "./route-edit"
 // drag never left the phone until the next foreground, and one failed attempt at
 // the moment of reconnecting was never retried. Everything now goes through here:
 // routes first (a queued change can point at a point only the route push creates
-// on the server), then the queue, one push in the air at a time.
+// on the server), then the queue, then the position fixes buffered offline (M9e WP5), one push in
+// the air at a time.
 
 // Waits before each automatic retry after a failure. Past the last, it stops and
 // leaves it to the next sweep (foreground or reconnect) or the paddler's own
@@ -38,6 +40,9 @@ async function pushOnce(): Promise<PushResult> {
     failed = true
   }
   await pushQueuedMutations().catch(() => {
+    failed = true
+  })
+  await pushBufferedPings().catch(() => {
     failed = true
   })
   return failed ? "failed" : "sent"

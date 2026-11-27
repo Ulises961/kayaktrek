@@ -8,6 +8,7 @@ import { CachedPackingItem } from "./CachedPackingItem"
 import { CachedProfileEntry } from "./CachedProfileEntry"
 import { CachedRequirement } from "./CachedRequirement"
 import { PendingMutation } from "./PendingMutation"
+import { PendingPositionPing } from "./PendingPositionPing"
 import { Day } from "./Day"
 import { Point } from "./Point"
 import { RequirementContribution } from "./RequirementContribution"
@@ -34,6 +35,7 @@ export {
   CachedRequirement,
   Day,
   PendingMutation,
+  PendingPositionPing,
   Point,
   RequirementContribution,
   RouteMeta,
@@ -60,6 +62,7 @@ export const modelClasses = [
   CachedRequirement,
   Day,
   PendingMutation,
+  PendingPositionPing,
   Point,
   RouteMeta,
   SyncCursor,

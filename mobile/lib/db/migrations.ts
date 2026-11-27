@@ -232,5 +232,24 @@ export const migrations = schemaMigrations({
         }),
       ],
     },
+    {
+      // M9e WP5 — position fixes buffered while offline.
+      toVersion: 15,
+      steps: [
+        createTable({
+          name: "pending_position_pings",
+          columns: [
+            { name: "trip_id", type: "string", isIndexed: true },
+            { name: "user_id", type: "string", isIndexed: true },
+            { name: "lat", type: "number" },
+            { name: "lon", type: "number" },
+            { name: "accuracy_m", type: "number", isOptional: true },
+            { name: "heading_deg", type: "number", isOptional: true },
+            { name: "speed_ms", type: "number", isOptional: true },
+            { name: "recorded_at", type: "number", isIndexed: true },
+          ],
+        }),
+      ],
+    },
   ],
 })

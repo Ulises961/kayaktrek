@@ -19,7 +19,7 @@ import { appSchema, tableSchema } from "nitromelondb/Schema"
 // one, real installs already on v4 immediately hit "no such table:
 // cached_connections" once the app started reading from it.
 export const appDatabaseSchema = appSchema({
-  version: 14,
+  version: 15,
   tables: [
     tableSchema({
       // When each cached surface was last successfully refreshed from the
@@ -374,6 +374,22 @@ export const appDatabaseSchema = appSchema({
         { name: "device_timestamp", type: "number" },
         { name: "status", type: "string" },
         { name: "reason", type: "string", isOptional: true },
+      ],
+    }),
+    tableSchema({
+      // M9e WP5: the paddler's own position fixes that could not be sent, kept for the track and
+      // uploaded oldest first when there is signal. Not folded into `pending_mutations`: those rows
+      // are changes the paddler made and can read about, and a day offshore is thousands of these.
+      name: "pending_position_pings",
+      columns: [
+        { name: "trip_id", type: "string", isIndexed: true },
+        { name: "user_id", type: "string", isIndexed: true },
+        { name: "lat", type: "number" },
+        { name: "lon", type: "number" },
+        { name: "accuracy_m", type: "number", isOptional: true },
+        { name: "heading_deg", type: "number", isOptional: true },
+        { name: "speed_ms", type: "number", isOptional: true },
+        { name: "recorded_at", type: "number", isIndexed: true },
       ],
     }),
   ],
