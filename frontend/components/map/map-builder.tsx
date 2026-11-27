@@ -17,6 +17,7 @@ import { PointListPane } from "./point-list-pane"
 import type { Day } from "@/lib/dtos/day"
 import type { Itinerary } from "@/lib/dtos/itinerary"
 import { mapReducer, initialMapState } from "@/lib/itinerary/map-reducer"
+import { routeSignature } from "@/lib/itinerary/server-sync"
 import { totalDistanceNm, DISTANCE_UNIT, type DistanceUnit } from "@/lib/itinerary/distance"
 import { MapBuilderContext } from "@/lib/itinerary/map-builder-context"
 import { initDraftBoundaries, type DraftBoundary } from "@/lib/itinerary/boundaries"
@@ -225,6 +226,15 @@ export function MapBuilder({
     })
     setDay0(days.find((d) => d.dayNumber === 0) ?? null)
   }, [])
+  const localSignature = useMemo(
+    () =>
+      routeSignature({
+        days: state.days,
+        points: state.points,
+        pointOrder: state.pointOrder,
+      }),
+    [state.days, state.points, state.pointOrder],
+  )
   const discardLocalEdit = useCallback(() => {
     setDraft(null)
     setRemovedRealDayIds([])
@@ -233,6 +243,7 @@ export function MapBuilder({
     itinerary,
     isEditing: draft !== null || state.pendingPointId !== null || removedRealDayIds.length > 0,
     isSaving,
+    localSignature,
     apply: applyServerItinerary,
     discardLocalEdit,
   })

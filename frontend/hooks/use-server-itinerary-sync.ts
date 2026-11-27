@@ -12,6 +12,9 @@ type Options = {
   // One of the user's own saves is in flight. Not a reason to alert anyone — the data
   // that arrives after it is theirs — so it only defers the sync.
   isSaving: boolean
+  // `routeSignature` of what the builder holds right now, its own saves included. A refresh
+  // that describes exactly this is the user's own change coming back, not someone else's.
+  localSignature: string
   // Replaces the builder's local state with the given itinerary's.
   apply: (itinerary: Itinerary) => void
   // Drops the unsaved local edit when the user chooses the server's version.
@@ -30,18 +33,29 @@ export function useServerItinerarySync({
   itinerary,
   isEditing,
   isSaving,
+  localSignature,
   apply,
   discardLocalEdit,
 }: Options) {
   const signature = useMemo(() => itinerarySignature(itinerary), [itinerary])
-  // The signature the builder's local state was last built from. The first render's props
-  // are what it was seeded with.
+  // The signature of the server data the builder last took in. The first render's props are
+  // what it was seeded with.
   const [appliedSignature, setAppliedSignature] = useState(signature)
 
-  const behind = signature !== appliedSignature
+  // The server now says what the builder already shows: the user's own saves, echoed back.
+  const matchesLocal = signature === localSignature
+  const behind = signature !== appliedSignature && !matchesLocal
   // Derived, so a change that reverts before the user acts on it stops being reported
   // without anything having to notice.
   const serverMovedWhileEditing = behind && isEditing && !isSaving
+
+  // Taking the echo in as applied keeps the next comparison against the server's latest
+  // state, not against what it said before the user's edit.
+  useEffect(() => {
+    if (!matchesLocal || signature === appliedSignature) return
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAppliedSignature(signature)
+  }, [matchesLocal, signature, appliedSignature])
 
   useEffect(() => {
     if (!behind || isSaving || isEditing) return
