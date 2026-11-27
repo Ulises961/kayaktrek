@@ -68,6 +68,36 @@ describe("TripDetailScreen", () => {
     expect(await findByTestId("trip-pause")).toBeTruthy()
   })
 
+  // The leader sets a planned trip off from the phone; nobody else can, and a trip
+  // already under way has nothing left to start.
+  it("offers the leader of a planned trip a Start trip button", async () => {
+    mockIsTripLeader.mockResolvedValue(true)
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+
+    const { findByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+
+    expect(await findByTestId("trip-start")).toBeTruthy()
+  })
+
+  it("offers crew no Start trip button on a planned trip", async () => {
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "building" })
+
+    const { findByText, queryByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    await findByText("Costa Brava")
+
+    expect(queryByTestId("trip-start")).toBeNull()
+  })
+
+  it("offers the leader no Start trip button once the trip is under way", async () => {
+    mockIsTripLeader.mockResolvedValue(true)
+    mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "happening" })
+
+    const { findByTestId, queryByTestId } = await render(<TripDetailScreen />, { wrapper: WithCachedSurfaces })
+    await findByTestId("trip-pause")
+
+    expect(queryByTestId("trip-start")).toBeNull()
+  })
+
   it("gives crew no trip controls", async () => {
     mockGetTrip.mockResolvedValue({ id: "trip-1", destination: "Costa Brava", state: "happening" })
 
