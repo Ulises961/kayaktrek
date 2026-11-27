@@ -45,6 +45,20 @@ jest.mock("expo-background-task", () => ({
   unregisterTaskAsync: jest.fn(),
 }))
 
+jest.mock("../../../db/position-buffer", () => ({
+  bufferPing: jest.fn(),
+  bufferedPingCount: jest.fn(),
+  discardBufferedPings: jest.fn(),
+}))
+jest.mock("../../../db/push-pending", () => ({ requestPush: jest.fn() }))
+
+const buffer = jest.mocked(jest.requireMock("../../../db/position-buffer")) as {
+  bufferPing: jest.Mock
+  bufferedPingCount: jest.Mock
+  discardBufferedPings: jest.Mock
+}
+const requestPush = jest.mocked(jest.requireMock("../../../db/push-pending").requestPush) as jest.Mock
+
 const location = jest.mocked(Location)
 const backgroundTask = jest.mocked(BackgroundTask)
 
@@ -96,6 +110,9 @@ beforeEach(() => {
   clock = T0
   send = jest.fn().mockResolvedValue({ kind: "sent" })
   deps = { now: () => clock, send }
+  buffer.bufferPing.mockReset().mockResolvedValue(undefined)
+  buffer.bufferedPingCount.mockReset().mockResolvedValue(0)
+  buffer.discardBufferedPings.mockReset().mockResolvedValue(0)
   location.requestForegroundPermissionsAsync.mockResolvedValue({ status: "granted" } as never)
   location.hasServicesEnabledAsync.mockResolvedValue(true)
   location.hasStartedLocationUpdatesAsync.mockResolvedValue(true)
@@ -173,6 +190,79 @@ describe("deliver", () => {
     expect(await deliver(fix(), deps)).toEqual({ kind: "sent" })
     expect(send).toHaveBeenCalledWith("trip-1", expect.objectContaining({ lat: 46.0, lon: 11.0 }))
     expect(getSharingRecord()).toMatchObject({ lastSentAt: T0 })
+  })
+
+  describe("a fix that could not be sent", () => {
+    it.each([SEND_FAILURE.OFFLINE, SEND_FAILURE.SERVER, SEND_FAILURE.RATE_LIMITED, SEND_FAILURE.SESSION])(
+      "is kept for the track when the failure is %s",
+      async (reason) => {
+        startRecord()
+        send.mockResolvedValueOnce({ kind: "retry", reason })
+        const thisFix = fix()
+
+        await deliver(thisFix, deps)
+
+        expect(buffer.bufferPing).toHaveBeenCalledWith("trip-1", thisFix)
+      },
+    )
+
+    it("is not kept when the server rejected the ping itself, since sending it again cannot help", async () => {
+      startRecord()
+      send.mockResolvedValueOnce({ kind: "retry", reason: SEND_FAILURE.REJECTED })
+      await deliver(fix(), deps)
+      expect(buffer.bufferPing).not.toHaveBeenCalled()
+    })
+
+    it("still counts as a failure on the share when it is kept", async () => {
+      startRecord()
+      send.mockResolvedValueOnce({ kind: "retry", reason: SEND_FAILURE.OFFLINE })
+      await deliver(fix(), deps)
+      expect(getSharingRecord()).toMatchObject({ lastSentAt: null, lastFailure: { at: T0, reason: SEND_FAILURE.OFFLINE } })
+    })
+
+    it("does not take the share down when the buffer cannot be written", async () => {
+      startRecord()
+      send.mockResolvedValueOnce({ kind: "retry", reason: SEND_FAILURE.OFFLINE })
+      buffer.bufferPing.mockRejectedValueOnce(new Error("database is locked"))
+      await expect(deliver(fix(), deps)).resolves.toEqual({ kind: "retry", reason: SEND_FAILURE.OFFLINE })
+      expect(getSharingRecord()).toMatchObject({ lastFailure: { reason: SEND_FAILURE.OFFLINE } })
+    })
+  })
+
+  describe("when a ping gets through", () => {
+    it("asks for the buffered fixes to be sent, now that there is signal", async () => {
+      startRecord()
+      buffer.bufferedPingCount.mockResolvedValue(40)
+      await deliver(fix(), deps)
+      expect(requestPush).toHaveBeenCalledTimes(1)
+    })
+
+    it("asks for nothing when nothing is waiting", async () => {
+      startRecord()
+      buffer.bufferedPingCount.mockResolvedValue(0)
+      await deliver(fix(), deps)
+      expect(requestPush).not.toHaveBeenCalled()
+    })
+
+    it("still reports the ping as sent when the buffer cannot be read", async () => {
+      startRecord()
+      buffer.bufferedPingCount.mockRejectedValue(new Error("database is locked"))
+      await expect(deliver(fix(), deps)).resolves.toEqual({ kind: "sent" })
+      expect(getSharingRecord()).toMatchObject({ lastSentAt: T0 })
+    })
+  })
+
+  describe("when the server says the share is over", () => {
+    it.each([STOP_REASON.TRIP_NOT_LIVE, STOP_REASON.NOT_ON_TRIP])(
+      "forgets that trip's buffered fixes (%s), which can no longer be sent",
+      async (reason) => {
+        startRecord()
+        send.mockResolvedValueOnce({ kind: "stop", reason })
+        await deliver(fix(), deps)
+        expect(buffer.discardBufferedPings).toHaveBeenCalledWith("trip-1")
+        expect(buffer.bufferPing).not.toHaveBeenCalled()
+      },
+    )
   })
 })
 

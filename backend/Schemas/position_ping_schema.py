@@ -19,3 +19,18 @@ class PositionPingSchema(BaseSchema):
     )
     speed_ms = fields.Float(allow_none=True, load_default=None, validate=validate.Range(min=0))
     recorded_at = fields.DateTime(allow_none=True, load_default=None)
+
+
+# How many buffered pings one upload may carry. The device sends oldest first in batches of
+# this size, so a long stretch offline is a few requests rather than one unbounded one.
+MAX_PINGS_PER_BATCH = 100
+
+
+class PositionBatchSchema(BaseSchema):
+    """An ordered upload of pings buffered while the device had no signal (M9e WP5)."""
+
+    pings = fields.List(
+        fields.Nested(PositionPingSchema),
+        required=True,
+        validate=validate.Length(min=1, max=MAX_PINGS_PER_BATCH),
+    )

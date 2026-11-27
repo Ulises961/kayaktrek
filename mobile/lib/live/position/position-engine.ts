@@ -5,10 +5,13 @@
 import { shouldSendPing, type PingAnchor } from "@shared/live/ping-throttle"
 import * as Location from "expo-location"
 
+import { bufferPing, bufferedPingCount, discardBufferedPings } from "../../db/position-buffer"
+import { requestPush } from "../../db/push-pending"
 import { sendPositionPing } from "./position-sender"
 import { getSharingRecord, setSharingRecord, updateSharingRecord } from "./sharing-state"
 import {
   POSITION_TASK,
+  SEND_FAILURE,
   STOP_REASON,
   type PositionFix,
   type SendOutcome,
@@ -77,19 +80,53 @@ export async function deliver(fix: PositionFix, deps: EngineDeps = liveDeps): Pr
   if (record === null || record.endedReason !== null) return null
   const now = deps.now()
 
-  const outcome = await deps.send(record.target.tripId, fix)
+  const { tripId } = record.target
+  const outcome = await deps.send(tripId, fix)
   switch (outcome.kind) {
     case "sent":
       markSent(fix, now)
+      await sendWhatWasKept()
       break
     case "retry":
       updateSharingRecord({ lastFailure: { at: now, reason: outcome.reason } })
+      // A ping the server refused as invalid would be refused again; any other failure is a gap in
+      // the track unless the fix is kept for later.
+      if (outcome.reason !== SEND_FAILURE.REJECTED) await keepForTheTrack(tripId, fix)
       break
     case "stop":
       await stopSharing(outcome.reason)
+      await forgetWhatWasKept(tripId)
       break
   }
   return outcome
+}
+
+// The buffer is a best effort beside the share: when it cannot be read or written the share carries
+// on, and the track has a gap, as it did before there was a buffer.
+async function keepForTheTrack(tripId: string, fix: PositionFix): Promise<void> {
+  try {
+    await bufferPing(tripId, fix)
+  } catch {
+    // Nothing to do: this fix is lost to the track.
+  }
+}
+
+// Called when a ping got through: there is signal, so whatever was kept can go too.
+async function sendWhatWasKept(): Promise<void> {
+  try {
+    if ((await bufferedPingCount()) > 0) requestPush()
+  } catch {
+    // Nothing to do: the next ping that gets through asks again.
+  }
+}
+
+// The trip is over for this paddler, so what was kept for it can never be sent.
+async function forgetWhatWasKept(tripId: string): Promise<void> {
+  try {
+    await discardBufferedPings(tripId)
+  } catch {
+    // Nothing to do: the next push is refused the same way and discards them then.
+  }
 }
 
 // The location task's body: the throttle picks the fixes to send.

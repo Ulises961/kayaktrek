@@ -7,6 +7,7 @@ import { ApiError } from "../../api/client"
 jest.mock("../database", () => ({ database: {} }))
 jest.mock("../mutation-queue", () => ({ pushQueuedMutations: jest.fn() }))
 jest.mock("../route-edit", () => ({ pushRouteChanges: jest.fn(), tripsWithRouteChanges: jest.fn() }))
+jest.mock("../position-buffer", () => ({ pushBufferedPings: jest.fn() }))
 
 type PushPending = typeof import("../push-pending")
 type PushStatusModule = typeof import("../../network/push-status")
@@ -16,6 +17,7 @@ let statusModule: PushStatusModule
 let mockPushQueued: jest.Mock
 let mockPushRoute: jest.Mock
 let mockTripsWithChanges: jest.Mock
+let mockPushPositions: jest.Mock
 
 // The module keeps its in-flight/backoff state at module level (it is one phone's
 // one push pipeline), so each test gets a fresh copy rather than inheriting the
@@ -26,9 +28,11 @@ beforeEach(() => {
   mockPushQueued = require("../mutation-queue").pushQueuedMutations
   mockPushRoute = require("../route-edit").pushRouteChanges
   mockTripsWithChanges = require("../route-edit").tripsWithRouteChanges
+  mockPushPositions = require("../position-buffer").pushBufferedPings
   mockPushQueued.mockReset().mockResolvedValue({ applied: 0, rejected: 0, kept: 0 })
   mockPushRoute.mockReset().mockResolvedValue("pushed")
   mockTripsWithChanges.mockReset().mockResolvedValue([])
+  mockPushPositions.mockReset().mockResolvedValue({ sent: 0, discarded: 0 })
   pushPendingModule = require("../push-pending")
   statusModule = require("../../network/push-status")
 })
@@ -78,6 +82,35 @@ describe("pushPending", () => {
     mockPushQueued.mockRejectedValue(new ApiError("down", 503))
 
     await expect(pushPendingModule.pushPending()).resolves.toBe("failed")
+  })
+
+  it("sends the buffered position fixes after the queued changes", async () => {
+    const order: string[] = []
+    mockPushQueued.mockImplementation(async () => {
+      order.push("queue")
+      return { applied: 0, rejected: 0, kept: 0 }
+    })
+    mockPushPositions.mockImplementation(async () => {
+      order.push("positions")
+      return { sent: 12, discarded: 0 }
+    })
+
+    expect(await pushPendingModule.pushPending()).toBe("sent")
+    expect(order).toEqual(["queue", "positions"])
+  })
+
+  it("reports failed when the position fixes cannot be sent, and still sent the queue", async () => {
+    mockPushPositions.mockRejectedValue(OFFLINE)
+
+    expect(await pushPendingModule.pushPending()).toBe("failed")
+    expect(mockPushQueued).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps sending the position fixes when the queue push fails", async () => {
+    mockPushQueued.mockRejectedValue(OFFLINE)
+
+    expect(await pushPendingModule.pushPending()).toBe("failed")
+    expect(mockPushPositions).toHaveBeenCalledTimes(1)
   })
 
   it("never runs two pushes at once, and a request made mid-flight gets a second pass", async () => {

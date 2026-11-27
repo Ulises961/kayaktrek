@@ -11,7 +11,7 @@ from sqlalchemy.exc import NoResultFound
 import logging
 
 from Api.limiter import limiter
-from Schemas.position_ping_schema import PositionPingSchema
+from Schemas.position_ping_schema import PositionBatchSchema, PositionPingSchema
 from Services.Middleware.auth_middleware import JWTService
 from Services.Middleware.privileges_middleware import require_owner, require_leader, _check_trip_ownership
 from Services.expedition_log_service import ExpeditionLogService
@@ -106,6 +106,43 @@ def post_position(id: str) -> ResponseReturnValue:
         raise
 
     return jsonify(PositionPingSchema().dump(ping)), HTTPStatus.CREATED
+
+
+@live_api.route("/trip/<string:id>/positions", methods=["POST"])
+@JWTService.authenticate_restful
+@require_owner("trip")
+@limiter.limit("30 per minute")
+def post_positions(id: str) -> ResponseReturnValue:
+    """
+    Record pings a device buffered while it had no signal.
+
+    Stores each ping with its own recording time, oldest first, and skips any the
+    member already has at that time, so a resend after a lost response stores
+    nothing twice. Only the newest ping may reach the live map, and only when it
+    is recent. Accepted while the trip is paused.
+    ---
+    post:
+      summary: Record a batch of buffered GPS pings
+      requestBody:
+        content:
+          application/json:
+            schema: PositionBatchSchema
+      responses:
+        201:
+          description: How many pings were stored and how many were already there
+        409:
+          description: The trip must be happening to share a position
+        422:
+          description: Validation error (no pings, more than 100, or an invalid ping)
+    """
+    data = PositionBatchSchema().load(request.get_json() or {})
+    try:
+        result = LivePositionService.record_batch(id, str(g.current_user_id), data["pings"])
+    except ValueError as error:
+        if str(error) == "trip_not_live":
+            abort(HTTPStatus.CONFLICT, description="The trip must be happening to share a position.")
+        raise
+    return jsonify(result), HTTPStatus.CREATED
 
 
 _CLOSE_DAY_ERROR_MESSAGES = {
