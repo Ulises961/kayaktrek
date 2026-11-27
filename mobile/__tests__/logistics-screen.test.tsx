@@ -3,7 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { OFFLINE_ERROR_MESSAGE } from "../lib/api/client"
 
-import LogisticsScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/logistics"
+import LogisticsScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/(tabs)/logistics"
 import { getSession } from "../lib/auth/session"
 import {
   createShuttleVehicle,

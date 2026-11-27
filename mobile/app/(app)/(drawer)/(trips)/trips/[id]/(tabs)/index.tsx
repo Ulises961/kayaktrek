@@ -11,8 +11,8 @@ import {
   type ViewAnnotationEvent,
 } from "@maplibre/maplibre-react-native";
 import {
-  Stack as RouterStack,
   useFocusEffect,
+  useIsFocused,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -35,7 +35,6 @@ import { lightTokens, palette } from "@shared/tokens";
 import { CrewPositionMarkers } from "@mobile/components/live/crew-position-markers";
 import { AddPointTooltip } from "@mobile/components/trips/add-point-tooltip";
 import { DayRail } from "@mobile/components/trips/day-rail";
-import { EditModeButton } from "@mobile/components/trips/edit-mode-button";
 import { ItinerarySheet } from "@mobile/components/trips/itinerary-sheet";
 import { MapVelocityOverlay } from "@mobile/components/trips/map-velocity-overlay";
 import { UndoSnackbar } from "@mobile/components/trips/undo-snackbar";
@@ -69,6 +68,7 @@ import { boundsOf } from "@mobile/lib/map/bounds";
 import type { MapViewState } from "@mobile/lib/map/project-lng-lat";
 import { MAP_STYLE } from "@mobile/lib/map/tiles";
 import { getTrip } from "@mobile/lib/trips/actions";
+import { usePublishTripEdit } from "@mobile/lib/trips/trip-header-edit";
 import { uuidv7 } from "@mobile/lib/uuid";
 
 // M9c WP6: the same live-first, cache-fallback shape as the trip list screen.
@@ -321,6 +321,15 @@ export default function TripMapScreen() {
     }
     setEditing(!editing);
   }
+
+  // The switch sits in the trip's header (M43). Tabs stay mounted behind the one in front, so
+  // it is only offered while this one is focused, or Crew would show an Edit button.
+  const isFocused = useIsFocused();
+  usePublishTripEdit({
+    canEdit: canEdit && isFocused,
+    editing,
+    onToggle: toggleEditing,
+  });
 
   const days: Day[] = useMemo(() => trip?.days ?? [], [trip]);
 
@@ -679,7 +688,6 @@ export default function TripMapScreen() {
         edges={["bottom"]}
         className="items-center justify-center gap-4 p-6"
       >
-        <RouterStack.Screen options={{ title: "Trip" }} />
         <Text className="text-center text-muted-foreground">{error}</Text>
       </Screen>
     );
@@ -688,7 +696,6 @@ export default function TripMapScreen() {
   if (!trip) {
     return (
       <Screen edges={["bottom"]} className="items-center justify-center">
-        <RouterStack.Screen options={{ title: "Trip" }} />
         <ActivityIndicator />
       </Screen>
     );
@@ -696,16 +703,6 @@ export default function TripMapScreen() {
 
   return (
     <Screen edges={["bottom"]}>
-      <RouterStack.Screen
-        options={{
-          title: trip.destination ?? "Trip",
-          // Only the leader of a trip that is not over gets a way into edit mode (M42).
-          headerRight: canEdit
-            ? () => <EditModeButton editing={editing} onToggle={toggleEditing} />
-            : undefined,
-        }}
-      />
-
       {/* M9l WP2 (revised): DayRail is a separate bar above the map, matching web's
           actual layout — not part of ItinerarySheet's handle (M9b3's original design,
           made before this plan's side-by-side reading of what web does). The map fills
