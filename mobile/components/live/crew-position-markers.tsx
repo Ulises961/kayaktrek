@@ -14,7 +14,6 @@ import { useOwnPosition } from "@mobile/lib/live/use-own-position"
 // How often the ages in the labels are recomputed. They read "N min ago", so a minute's worth of
 // drift is invisible and a faster tick would only re-render the map for nothing.
 const AGE_TICK_MS = 30_000
-const QUIET_OPACITY = 0.45
 
 // The live layer of the itinerary map (M9e WP3): the crew's newest positions, and the paddler's own
 // marker from the phone's own fix. Mounts inside the map; `live` is whether the trip is under way,
@@ -55,22 +54,21 @@ export function CrewPositionMarkers({ tripId, live }: { tripId: string; live: bo
           return (
             <ViewAnnotation key={position.userId} id={`crew-${position.userId}`} lngLat={[position.lon, position.lat]}>
               <View style={{ alignItems: "center" }}>
+                {/* Last known, not live, is told apart by shape, not by fading, which a busy chart
+                    swallows: a pale centre and a dashed ring, fully opaque. */}
                 <View
                   testID={`crew-dot-${position.userId}`}
                   style={{
                     width: 14,
                     height: 14,
                     borderRadius: 7,
-                    backgroundColor: palette.foam400,
+                    backgroundColor: label.stale ? palette.foam100 : palette.foam400,
                     borderWidth: 2,
+                    borderStyle: label.stale ? "dashed" : "solid",
                     borderColor: palette.ocean900,
-                    opacity: label.stale ? QUIET_OPACITY : 1,
                   }}
                 />
-                <View
-                  className="mt-0.5 rounded bg-card px-1"
-                  style={{ opacity: label.stale ? QUIET_OPACITY : 1 }}
-                >
+                <View className="mt-0.5 rounded bg-card px-1">
                   <Text className="text-[11px] text-foreground">{label.text}</Text>
                 </View>
               </View>

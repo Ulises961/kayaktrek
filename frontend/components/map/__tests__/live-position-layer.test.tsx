@@ -12,7 +12,13 @@ vi.mock("react-leaflet", () => ({
   }: {
     children: React.ReactNode
     center: [number, number]
-    pathOptions: { fillOpacity: number; fillColor: string; color: string }
+    pathOptions: {
+      fillOpacity: number
+      fillColor: string
+      color: string
+      opacity: number
+      dashArray?: string
+    }
   }) => (
     <div
       data-testid="circle-marker"
@@ -20,12 +26,16 @@ vi.mock("react-leaflet", () => ({
       data-fill-opacity={pathOptions.fillOpacity}
       data-fill-color={pathOptions.fillColor}
       data-stroke-color={pathOptions.color}
+      data-stroke-opacity={pathOptions.opacity}
+      data-dash-array={pathOptions.dashArray}
     >
       {children}
     </div>
   ),
-  Tooltip: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="tooltip">{children}</div>
+  Tooltip: ({ children, permanent }: { children: React.ReactNode; permanent?: boolean }) => (
+    <div data-testid="tooltip" data-permanent={permanent ? "true" : "false"}>
+      {children}
+    </div>
   ),
 }))
 
@@ -73,28 +83,56 @@ describe("LivePositionLayer", () => {
     expect(screen.getByTestId("tooltip").textContent).toContain("5 min ago")
   })
 
-  it("fades a position older than 10 minutes", () => {
+  // A position not refreshed for ten minutes ("last known", not live) is told apart by shape, not
+  // by fading: a faded dot is lost against a busy chart. It stays fully opaque and ringed, goes
+  // hollow (pale centre) with a dashed ring, and keeps its age on show.
+  describe("a position older than 10 minutes", () => {
     const now = new Date("2026-07-20T10:20:00Z")
-    render(
-      <LivePositionLayer
-        positions={[position({ recordedAt: "2026-07-20T10:00:00Z" })]}
-        now={now}
-      />,
-    )
-    const marker = screen.getByTestId("circle-marker")
-    expect(Number(marker.dataset.fillOpacity)).toBeLessThan(0.5)
+    const stale = () => position({ recordedAt: "2026-07-20T10:00:00Z" })
+
+    it("is hollow and dashed instead of faded, still fully opaque", () => {
+      render(<LivePositionLayer positions={[stale()]} now={now} />)
+
+      const marker = screen.getByTestId("circle-marker")
+      expect(marker.dataset.fillColor).toBe(palette.foam100)
+      expect(marker.dataset.fillColor).not.toBe(palette.foam400)
+      expect(marker.dataset.dashArray).toBeTruthy()
+      expect(Number(marker.dataset.fillOpacity)).toBe(1)
+      expect(Number(marker.dataset.strokeOpacity)).toBe(1)
+    })
+
+    it("keeps the ink ring that separates it from the chart", () => {
+      render(<LivePositionLayer positions={[stale()]} now={now} />)
+
+      expect(screen.getByTestId("circle-marker").dataset.strokeColor).toBe(palette.ocean900)
+    })
+
+    it("shows its age on the map without a hover", () => {
+      render(<LivePositionLayer positions={[stale()]} now={now} />)
+
+      expect(screen.getByTestId("tooltip").dataset.permanent).toBe("true")
+      expect(screen.getByTestId("tooltip").textContent).toContain("20 min ago")
+    })
   })
 
-  it("does not fade a fresh position", () => {
+  describe("a position under 10 minutes old", () => {
     const now = new Date("2026-07-20T10:02:00Z")
-    render(
-      <LivePositionLayer
-        positions={[position({ recordedAt: "2026-07-20T10:00:00Z" })]}
-        now={now}
-      />,
-    )
-    const marker = screen.getByTestId("circle-marker")
-    expect(Number(marker.dataset.fillOpacity)).toBeGreaterThan(0.5)
+    const fresh = () => position({ recordedAt: "2026-07-20T10:00:00Z" })
+
+    it("is a solid, filled dot with an unbroken ring", () => {
+      render(<LivePositionLayer positions={[fresh()]} now={now} />)
+
+      const marker = screen.getByTestId("circle-marker")
+      expect(marker.dataset.fillColor).toBe(palette.foam400)
+      expect(marker.dataset.dashArray).toBeUndefined()
+      expect(Number(marker.dataset.fillOpacity)).toBeGreaterThan(0.5)
+    })
+
+    it("leaves its tooltip to hover", () => {
+      render(<LivePositionLayer positions={[fresh()]} now={now} />)
+
+      expect(screen.getByTestId("tooltip").dataset.permanent).toBe("false")
+    })
   })
 
   it("marks a live paddler in the live colour, not the destructive one", () => {

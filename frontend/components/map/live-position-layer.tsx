@@ -31,15 +31,20 @@ export function LivePositionLayer({ positions, now }: Props) {
             // from pale chart water by hue alone; a ring separates by value instead, and
             // value survives both the blue of open water and the beige of the coast. So
             // the fill is free to carry meaning while the ring carries the contrast.
+            //
+            // A position that has not refreshed for a while is "last known", and says so by
+            // shape: a pale centre and a dashed ring, fully opaque. Fading it instead lost it
+            // against a busy chart, and the ring is the one thing that survives any background.
             pathOptions={{
               color: palette.ocean900,
-              fillColor: palette.foam400,
-              fillOpacity: stale ? 0.35 : 0.9,
-              opacity: stale ? 0.45 : 1,
+              fillColor: stale ? palette.foam100 : palette.foam400,
+              fillOpacity: stale ? 1 : 0.9,
+              opacity: 1,
               weight: 2,
+              dashArray: stale ? "3 3" : undefined,
             }}
           >
-            <Tooltip>
+            <Tooltip permanent={stale} direction="top" offset={[0, -8]}>
               {position.name} · {formatMinutesAgo(position.recordedAt, now)}
             </Tooltip>
           </CircleMarker>
