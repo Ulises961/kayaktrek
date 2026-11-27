@@ -1,7 +1,7 @@
 import json
 import logging
-from datetime import datetime, timezone
-from typing import Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
 from uuid import UUID
 
 from Api.database import db
@@ -15,6 +15,19 @@ logger = logging.getLogger(__name__)
 
 def live_channel(trip_id: str) -> str:
     return f"live:trip:{trip_id}"
+
+
+# A buffered ping newer than this is still news to the crew's live map; an older one is track only.
+BACKLOG_PUBLISH_WINDOW = timedelta(minutes=5)
+
+
+def _clamped_time(recorded_at: Optional[datetime], now: datetime) -> datetime:
+    """The ping's own time, in UTC, never later than `now` (a device clock can run ahead)."""
+    if recorded_at is None:
+        return now
+    if recorded_at.tzinfo is None:
+        recorded_at = recorded_at.replace(tzinfo=timezone.utc)
+    return min(recorded_at, now)
 
 
 class LivePositionService:
@@ -52,6 +65,70 @@ class LivePositionService:
 
         LivePositionService._publish(trip_id, ping)
         return ping
+
+    @staticmethod
+    def record_batch(trip_id: str, user_id: str, pings: list[dict[str, Any]]) -> dict[str, int]:
+        """Persist pings a device buffered while offline; returns how many were new and how many
+        were already stored.
+
+        A ping already stored for this member at the same `recorded_at` counts as a duplicate, so
+        a batch resent after a lost response stores nothing twice. A backlog never reaches the
+        live map: only the newest new ping is published, and only when it is recent and newer than
+        what the member's last stored ping already shows.
+
+        Raises ValueError("trip_not_live") unless the trip is `happening`.
+        """
+        trip = db.session.query(Trip).filter_by(id=UUID(trip_id)).first()
+        if trip is None or trip.state != TripStateType.HAPPENING:
+            raise ValueError("trip_not_live")
+
+        now = datetime.now(timezone.utc)
+        ping_by_time: dict[datetime, dict[str, Any]] = {}
+        for ping in pings:
+            ping_by_time.setdefault(_clamped_time(ping.get("recorded_at"), now), ping)
+
+        member_pings = db.session.query(PositionPing.recorded_at).filter(
+            PositionPing.trip_id == UUID(trip_id), PositionPing.user_id == UUID(user_id)
+        )
+        stored_times = {
+            row.recorded_at
+            for row in member_pings.filter(
+                PositionPing.recorded_at >= min(ping_by_time), PositionPing.recorded_at <= max(ping_by_time)
+            )
+        }
+        previous_newest: Optional[datetime] = member_pings.order_by(PositionPing.recorded_at.desc()).limit(1).scalar()
+
+        new_pings: list[PositionPing] = []
+        for recorded_at in sorted(ping_by_time):
+            if recorded_at in stored_times:
+                continue
+            ping = ping_by_time[recorded_at]
+            new_pings.append(
+                PositionPing(
+                    trip_id=UUID(trip_id),
+                    user_id=UUID(user_id),
+                    lat=ping["lat"],
+                    lon=ping["lon"],
+                    accuracy_m=ping.get("accuracy_m"),
+                    heading_deg=ping.get("heading_deg"),
+                    speed_ms=ping.get("speed_ms"),
+                    recorded_at=recorded_at,
+                )
+            )
+        db.session.add_all(new_pings)
+        db.session.commit()
+
+        if new_pings:
+            newest = new_pings[-1]
+            is_recent = now - newest.recorded_at <= BACKLOG_PUBLISH_WINDOW
+            if is_recent and (previous_newest is None or newest.recorded_at > previous_newest):
+                LivePositionService._publish(trip_id, newest)
+
+        logger.info(
+            "position_batch_recorded",
+            extra={"trip_id": trip_id, "user_id": user_id, "accepted": len(new_pings), "sent": len(pings)},
+        )
+        return {"accepted": len(new_pings), "duplicates": len(pings) - len(new_pings)}
 
     @staticmethod
     def to_broadcast_dict(ping: PositionPing) -> dict[str, Any]:
