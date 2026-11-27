@@ -3,7 +3,7 @@ import { fireEvent, render, waitFor } from "@testing-library/react-native"
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 import { Alert } from "react-native"
 
-import InventoryScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/items"
+import InventoryScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/(tabs)/items"
 import { getSession } from "../lib/auth/session"
 import {
   addRequirement,

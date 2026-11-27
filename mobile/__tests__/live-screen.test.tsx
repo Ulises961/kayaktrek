@@ -5,7 +5,7 @@ import type { LivePosition } from "@shared/dtos/live-position"
 
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
-import LiveScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/live"
+import LiveScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/(tabs)/live"
 import { loadOfflineCrew, type OfflineCrewMember } from "../lib/db/offline-float-plan"
 import { isTripLeader } from "../lib/db/trip-role"
 import { formatAge } from "../lib/live/position/sharing-status"

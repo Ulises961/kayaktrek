@@ -2,7 +2,7 @@ import { render, waitFor } from "@testing-library/react-native"
 
 import { WithCachedSurfaces } from "../test-utils/cached-surfaces"
 
-import FloatPlanScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/float-plan"
+import FloatPlanScreen from "../app/(app)/(drawer)/(trips)/trips/[id]/(tabs)/float-plan"
 import { getLogistics, getTrip } from "../lib/trips/actions"
 import { loadOfflineCrew } from "../lib/db/offline-float-plan"
 import { loadTripListCache } from "../lib/db/trip-list-cache"
