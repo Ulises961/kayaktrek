@@ -14,10 +14,15 @@ vi.mock("@/lib/trips/actions", () => ({
   advanceState: vi.fn(),
 }))
 
+vi.mock("@/lib/itinerary/actions", () => ({
+  generateStoryShare: vi.fn().mockResolvedValue({ success: false, error: "unused" }),
+}))
+
 import { TripActionsMenu } from "../trip-actions-menu"
 import { TRIP_STATE, type Trip } from "@/lib/dtos/trip"
 import { MEMBER_ROLE } from "@/lib/dtos/trip-member"
 import { leaveTrip, pauseTrip, deleteTripForEveryone, advanceState } from "@/lib/trips/actions"
+import { generateStoryShare } from "@/lib/itinerary/actions"
 
 const TRIP: Trip = {
   id: "01952f1a-0000-7000-8000-000000000001",
@@ -48,6 +53,12 @@ const TRIP: Trip = {
 }
 
 const HAPPENING: Trip = { ...TRIP, state: TRIP_STATE.HAPPENING }
+
+const ITINERARY_ID = "01952f1a-0000-7000-8000-0000000000aa"
+const WITH_ITINERARY: Trip = {
+  ...TRIP,
+  itinerary: { id: ITINERARY_ID, name: "Cinque Terre", isPublic: false, days: [] },
+}
 
 beforeEach(() => vi.clearAllMocks())
 
@@ -110,6 +121,23 @@ describe("TripActionsMenu — what each person is offered", () => {
     expect(item(/delete trip/i)).not.toBeInTheDocument()
   })
 
+  it("offers the leader Share story, and crew do not get it", async () => {
+    const { unmount } = render(<TripActionsMenu trip={WITH_ITINERARY} isLeader isMember />)
+    await openMenu()
+    expect(item(/share story/i)).toBeInTheDocument()
+    unmount()
+
+    render(<TripActionsMenu trip={WITH_ITINERARY} isLeader={false} isMember />)
+    await openMenu()
+    expect(item(/share story/i)).not.toBeInTheDocument()
+  })
+
+  it("offers no Share story on a trip that has no itinerary to share", async () => {
+    render(<TripActionsMenu trip={TRIP} isLeader isMember />)
+    await openMenu()
+    expect(item(/share story/i)).not.toBeInTheDocument()
+  })
+
   it("holds only actions: the trip's difficulty is on the page, not in the menu", async () => {
     render(<TripActionsMenu trip={TRIP} isLeader isMember />)
     await openMenu()
@@ -130,6 +158,30 @@ describe("TripActionsMenu — each item opens its own confirmation, and nothing 
 
     expect(await screen.findByRole("dialog", { name: /edit trip/i })).toBeInTheDocument()
     expect(screen.getByRole("textbox", { name: /destination/i })).toHaveValue("Cinque Terre")
+  })
+
+  it("opens the story link dialog for this trip's itinerary, creating nothing until asked", async () => {
+    render(<TripActionsMenu trip={WITH_ITINERARY} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/share story/i)!)
+
+    expect(await screen.findByRole("dialog", { name: /share trip story/i })).toBeInTheDocument()
+    expect(generateStoryShare).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole("button", { name: /create link/i }))
+    expect(generateStoryShare).toHaveBeenCalledWith(ITINERARY_ID)
+  })
+
+  it("shows an existing story link straight away", async () => {
+    const shared: Trip = {
+      ...WITH_ITINERARY,
+      itinerary: { ...WITH_ITINERARY.itinerary!, storyShareToken: "tok_existing" },
+    }
+    render(<TripActionsMenu trip={shared} isLeader isMember />)
+    await openMenu()
+    await userEvent.click(item(/share story/i)!)
+
+    expect(await screen.findByText(/tok_existing/)).toBeInTheDocument()
   })
 
   it("asks before beginning the expedition, and moves this trip to happening once confirmed", async () => {
