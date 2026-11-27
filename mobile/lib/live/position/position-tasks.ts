@@ -7,25 +7,17 @@ import type * as Location from "expo-location"
 import * as TaskManager from "expo-task-manager"
 import { AppState } from "react-native"
 
-import { logEvent } from "../../spike/events"
 import { POSITION_TASK, ensureRunning, handleFixes } from "./position-engine"
 import { runWatchdog } from "./watchdog"
 import { WATCHDOG_TASK } from "./watchdog-schedule"
 
-function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
-
 TaskManager.defineTask<{ locations: Location.LocationObject[] }>(POSITION_TASK, async ({ data, error }) => {
-  if (error) {
-    logEvent({ ev: "error", t: Date.now(), message: error.message })
-    return
-  }
+  if (error) return
   try {
     await handleFixes(data.locations)
-  } catch (caught) {
+  } catch {
     // Nothing above this call can show an error, and a throw here would take the task's process down.
-    logEvent({ ev: "error", t: Date.now(), message: `fix handler: ${errorText(caught)}` })
+    // The next fix is handled afresh.
   }
 })
 
@@ -33,8 +25,7 @@ TaskManager.defineTask(WATCHDOG_TASK, async () => {
   try {
     await runWatchdog()
     return BackgroundTask.BackgroundTaskResult.Success
-  } catch (caught) {
-    logEvent({ ev: "error", t: Date.now(), message: `keep-alive: ${errorText(caught)}` })
+  } catch {
     return BackgroundTask.BackgroundTaskResult.Failed
   }
 })
@@ -47,10 +38,8 @@ let watching = false
 export function watchSharing(): void {
   if (watching) return
   watching = true
-  const check = (trigger: "launch" | "foreground") =>
-    ensureRunning(trigger).catch((caught: unknown) =>
-      logEvent({ ev: "error", t: Date.now(), message: `ensure running: ${errorText(caught)}` }),
-    )
+  // A failed check is retried on the next return to the foreground and at the next keep-alive wake.
+  const check = (trigger: "launch" | "foreground") => ensureRunning(trigger).catch(() => undefined)
   void check("launch")
   AppState.addEventListener("change", (state) => {
     if (state === "active") void check("foreground")

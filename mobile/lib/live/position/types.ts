@@ -3,13 +3,8 @@ import { z } from "zod"
 // The location task's name, in expo-task-manager's registry.
 export const POSITION_TASK = "kayaktrek-position"
 
-// What a share is for. A "practice" share runs the whole engine (permission, foreground service,
-// throttle, watchdog, evidence log) and sends nothing, so a condition can be exercised without a
-// trip that is `happening`.
-export const SharingTargetSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("trip"), tripId: z.string().min(1) }),
-  z.object({ kind: z.literal("practice") }),
-])
+// What a share is for: the trip whose crew sees the position.
+export const SharingTargetSchema = z.object({ kind: z.literal("trip"), tripId: z.string().min(1) })
 export type SharingTarget = z.infer<typeof SharingTargetSchema>
 
 // Why a share ended without the paddler pressing Stop.
@@ -60,5 +55,3 @@ export type SendOutcome =
   | { kind: "sent" }
   | { kind: "stop"; reason: typeof STOP_REASON.TRIP_NOT_LIVE | typeof STOP_REASON.NOT_ON_TRIP }
   | { kind: "retry"; reason: SendFailure }
-
-export type PingSource = "movement" | "keep-alive"

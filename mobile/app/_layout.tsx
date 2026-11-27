@@ -1,19 +1,15 @@
 import "../global.css"
 
-import { Link, Slot } from "expo-router"
-import { StyleSheet, View } from "react-native"
+import { Slot } from "expo-router"
 import { GestureHandlerRootView } from "react-native-gesture-handler"
 import { SafeAreaProvider } from "react-native-safe-area-context"
 
-// M9e: registers the location and keep-alive tasks before any fix or wake-up can arrive, and starts
-// the evidence log (app state, network, heartbeat, and the native screen/battery/location-switch log).
+// M9e: registers the location and keep-alive tasks before any fix or wake-up can arrive.
 import { watchSharing } from "../lib/live/position/position-tasks"
-import { startDeviceWatch } from "../lib/spike/device-watch"
 import { AuthProvider } from "../lib/auth/auth-context"
 import { QueuedChangesProvider } from "../lib/db/queued-changes-provider"
 import { CachedSurfacesProvider } from "../lib/network/cached-surfaces"
 
-startDeviceWatch()
 watchSharing()
 
 // Root layout — the one place `global.css` (NativeWind's stylesheet) is imported, and the
@@ -42,25 +38,6 @@ export default function RootLayout() {
             </AuthProvider>
           </QueuedChangesProvider>
         </CachedSurfacesProvider>
-        {/* M9e WP0 spike: always-visible way back to the spike screen after the app is
-            relaunched on a walk, with no computer to deep-link from. Removed with the spike. */}
-        <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-          <Link
-            href="/spike-location"
-            style={{
-              position: "absolute",
-              bottom: 24,
-              left: 8,
-              padding: 10,
-              backgroundColor: "#000000bb",
-              color: "#ffffff",
-              borderRadius: 6,
-              overflow: "hidden",
-            }}
-          >
-            spike
-          </Link>
-        </View>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   )

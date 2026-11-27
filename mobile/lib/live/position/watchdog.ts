@@ -1,6 +1,5 @@
 import * as Location from "expo-location"
 
-import { logEvent } from "../../spike/events"
 import { keepAliveDue } from "./keep-alive"
 import { deliver, ensureRunning, fixFromLocation, type EngineDeps } from "./position-engine"
 import { sendPositionPing } from "./position-sender"
@@ -24,7 +23,7 @@ async function currentFix(): Promise<PositionFix | null> {
   }
 }
 
-const liveDeps: WatchdogDeps = { now: Date.now, send: sendPositionPing, log: logEvent, currentFix }
+const liveDeps: WatchdogDeps = { now: Date.now, send: sendPositionPing, currentFix }
 
 // The keep-alive (the M9e plan, WP1), run by the work scheduler about hourly. It first makes sure the
 // location service is still alive, then, if no ping has gone out lately, sends one fresh fix so that
@@ -33,25 +32,15 @@ export async function runWatchdog(deps: WatchdogDeps = liveDeps): Promise<void> 
   const now = deps.now()
   const record = getSharingRecord()
   if (record === null || record.endedReason !== null) {
-    deps.log({ ev: "watchdog", t: now, outcome: "no-share", sinceLastWakeMs: null })
     await unregisterWatchdog()
     return
   }
 
-  const sinceLastWakeMs = record.lastWakeAt === null ? null : now - record.lastWakeAt
-  await ensureRunning("watchdog", deps)
+  await ensureRunning("watchdog")
   updateSharingRecord({ lastWakeAt: now })
 
-  if (!keepAliveDue(record.lastSentAt, now)) {
-    deps.log({ ev: "watchdog", t: now, outcome: "recent", sinceLastWakeMs })
-    return
-  }
+  if (!keepAliveDue(record.lastSentAt, now)) return
   const fix = await deps.currentFix()
-  if (fix === null) {
-    deps.log({ ev: "watchdog", t: now, outcome: "no-fix", sinceLastWakeMs })
-    return
-  }
-  const outcome = await deliver(fix, "keep-alive", deps)
-  const result = outcome?.kind === "sent" ? "sent" : outcome?.kind === "stop" ? "stopped" : "failed"
-  deps.log({ ev: "watchdog", t: now, outcome: result, sinceLastWakeMs })
+  if (fix === null) return
+  await deliver(fix, deps)
 }
