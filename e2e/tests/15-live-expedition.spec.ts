@@ -198,7 +198,8 @@ test.describe("Live expedition — Navigate mode position sharing", () => {
       await page.context().setGeolocation({ latitude: 43.01, longitude: 13.01 })
 
       await page.goto(`/itinerary/${itineraryId}?navigate=1`)
-      // The deep link opens the consent dialog and shares nothing until it is confirmed.
+      // The deep link only watches; sharing is its own choice, behind its own consent dialog.
+      await page.getByRole("button", { name: "Share my position" }).click()
       await page.getByRole("button", { name: "Start sharing" }).click()
       // usePositionWatch sends its first reading immediately — there's no prior
       // position to throttle against — so the status chip flips off "Acquiring
@@ -243,8 +244,10 @@ test.describe("Live expedition — Navigate mode position sharing", () => {
 
       await page.goto(`/itinerary/${itineraryId}?navigate=1`)
       await crewPage.goto(`/itinerary/${itineraryId}?navigate=1`)
-      // Each side confirms its own consent dialog; the deep link shares nothing before that.
+      // Each side chooses to share and confirms its own consent dialog; the deep link only watches.
+      await page.getByRole("button", { name: "Share my position" }).click()
       await page.getByRole("button", { name: "Start sharing" }).click()
+      await crewPage.getByRole("button", { name: "Share my position" }).click()
       await crewPage.getByRole("button", { name: "Start sharing" }).click()
 
       await expect(page.getByText(/sharing position/i)).toBeVisible()

@@ -8,6 +8,7 @@ import { useContentLayout } from "@/hooks/use-content-layout"
 import { usePositionWatch } from "@/hooks/use-position-watch"
 import { useLivePositions } from "@/hooks/use-live-positions"
 import { useServerItinerarySync } from "@/hooks/use-server-itinerary-sync"
+import { Button } from "@/components/ui/button"
 import { CloseDayButton } from "./close-day-button"
 import { MapTopBar } from "./map-top-bar"
 import { PositionConsentDialog, POSITION_SOURCE } from "@/components/common/position-consent-dialog"
@@ -87,42 +88,48 @@ export function MapBuilder({
   const [conditionsVersion, setConditionsVersion] = useState(0)
   // Honors the `?navigate=1` deep link once, at mount — as a state initializer
   // rather than an effect, so a user who explicitly turns Navigate off is never
-  // fought by a later re-run. It opens the consent dialog rather than entering
-  // Navigate mode directly: a deep link is exactly as much "I am now sharing my
-  // location" as a button click, and must not skip the same confirmation. With
-  // inReach as the source nothing from the device is shared, so it enters directly.
+  // fought by a later re-run. A link only ever watches: sharing the device's position
+  // is a separate choice, made in the app and behind its own consent dialog.
   const searchParams = useSearchParams()
   const navigateDeepLink = showNavigate && searchParams.get("navigate") === "1"
-  const [navigateMode, setNavigateMode] = useState(() => navigateDeepLink && inReachIsSource)
-  const [showNavigateConfirm, setShowNavigateConfirm] = useState(
-    () => navigateDeepLink && !inReachIsSource,
-  )
+  const [navigateMode, setNavigateMode] = useState(() => navigateDeepLink)
+  const [sharing, setSharing] = useState(false)
+  const [showShareConfirm, setShowShareConfirm] = useState(false)
   const [streamUrl, setStreamUrl] = useState<string | null>(null)
 
   const bumpConditions = useCallback(() => setConditionsVersion((v) => v + 1), [])
 
   // ── Navigate mode (M8) ──────────────────────────────────────────────────
-  // Turning Navigate ON shares live location (Privacy §2/§3's "explicit consent"
-  // claim) and goes through PositionConsentDialog first. Turning it OFF stops
-  // sharing and needs no confirmation of its own. When the member's position comes
-  // from their inReach, Navigate only shows the crew, so it starts without asking.
+  // Navigate shows the crew. Sharing the device's own position is a second switch in the
+  // Navigate bar, and turning it ON shares live location (Privacy §2/§3's "explicit
+  // consent" claim), so it goes through PositionConsentDialog first. Turning it OFF, or
+  // leaving Navigate, stops sharing and needs no confirmation; a new Navigate session
+  // starts by watching only. When the member's position comes from their inReach there
+  // is nothing from the device to share and no switch.
 
-  const handleConfirmNavigate = useCallback(() => {
-    setNavigateMode(true)
-    setViewMode(true)
+  const leaveNavigate = useCallback(() => {
+    setNavigateMode(false)
+    setSharing(false)
   }, [])
 
   const handleToggleNavigate = useCallback(() => {
     if (navigateMode) {
-      setNavigateMode(false)
+      leaveNavigate()
       return
     }
-    if (inReachIsSource) {
-      handleConfirmNavigate()
+    setNavigateMode(true)
+    setViewMode(true)
+  }, [navigateMode, leaveNavigate])
+
+  const handleToggleSharing = useCallback(() => {
+    if (sharing) {
+      setSharing(false)
       return
     }
-    setShowNavigateConfirm(true)
-  }, [navigateMode, inReachIsSource, handleConfirmNavigate])
+    setShowShareConfirm(true)
+  }, [sharing])
+
+  const handleConfirmShare = useCallback(() => setSharing(true), [])
 
   const mintStreamUrl = useCallback(
     () => (tripId ? getStreamTicket(tripId) : Promise.resolve(null)),
@@ -143,7 +150,7 @@ export function MapBuilder({
     }
   }, [navigateMode, tripId, mintStreamUrl])
 
-  const positionWatch = usePositionWatch(tripId ?? "", navigateMode && !inReachIsSource)
+  const positionWatch = usePositionWatch(tripId ?? "", navigateMode && sharing && !inReachIsSource)
   const liveStream = useLivePositions(navigateMode ? streamUrl : null, {
     mintUrl: mintStreamUrl,
   })
@@ -151,6 +158,11 @@ export function MapBuilder({
   const navigateStatusLabel = inReachIsSource ? (
     <>
       inReach · {liveStream.positions.length}
+      <span className="sr-only sm:not-sr-only"> crew</span> live
+    </>
+  ) : !sharing ? (
+    <>
+      Watching · {liveStream.positions.length}
       <span className="sr-only sm:not-sr-only"> crew</span> live
     </>
   ) : positionWatch.status === "denied" ? (
@@ -462,12 +474,12 @@ export function MapBuilder({
       // Edit and Navigate are mutually exclusive — Navigate is a View-only sub-state
       // (handleToggleNavigate already forces viewMode true on entry), so leaving View
       // for Edit must also leave Navigate, or the two ended up simultaneously true.
-      if (!next) setNavigateMode(false)
+      if (!next) leaveNavigate()
       return next
     })
     setSelectedDayId(null)
     setSelectedPointId(null)
-  }, [])
+  }, [leaveNavigate])
 
   const ctxValue = useMemo(
     () => ({
@@ -550,9 +562,9 @@ export function MapBuilder({
         />
         <PositionConsentDialog
           source={POSITION_SOURCE.DEVICE}
-          open={showNavigateConfirm}
-          onOpenChange={setShowNavigateConfirm}
-          onConfirm={handleConfirmNavigate}
+          open={showShareConfirm}
+          onOpenChange={setShowShareConfirm}
+          onConfirm={handleConfirmShare}
         />
         {/* Panels are layout siblings of the map, not overlays — they push the map
             narrower instead of covering it, so no information is hidden.
@@ -580,6 +592,16 @@ export function MapBuilder({
                 <div className="bg-primary text-primary-foreground rounded-full px-3 py-1 text-xs font-semibold shadow">
                   {navigateStatusLabel}
                 </div>
+                {!inReachIsSource && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={handleToggleSharing}
+                    className="rounded-full shadow"
+                  >
+                    {sharing ? "Stop sharing" : "Share my position"}
+                  </Button>
+                )}
                 {isLeader && tripId && <CloseDayButton tripId={tripId} />}
               </div>
             )}

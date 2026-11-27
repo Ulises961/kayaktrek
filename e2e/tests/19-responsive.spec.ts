@@ -1200,7 +1200,7 @@ test.describe("Responsive — the itinerary builder at 320 (M18 §4)", () => {
 
       // Settle before measuring — this is a layout assertion, and an unsettled layout is
       // not the one under test.
-      await expect(chrome).toContainText(/Location denied|Location unavailable|Sharing/)
+      await expect(chrome).toContainText(/Location denied|Location unavailable|Sharing|Watching/)
       await expect(chrome).toHaveCount(1)
       await expect(chrome).toBeVisible()
 

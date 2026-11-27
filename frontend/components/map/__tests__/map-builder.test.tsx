@@ -826,13 +826,109 @@ describe("MapBuilder — Navigate mode", () => {
     expect(screen.getByTestId("point-list-pane")).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
-    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
 
     expect(screen.getByTestId("day-rail")).toBeInTheDocument() // back in view mode
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching")
+  })
+
+  // Watching the crew and sharing one's own position are separate acts: seeing where the
+  // group is must not cost a paddler their own location.
+  it("enters Navigate without asking for consent, and shares nothing", async () => {
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching · 0 crew live")
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, false)
+  })
+
+  it("shows the crew's positions while only watching", async () => {
+    mockUseLivePositions.mockReturnValue({
+      positions: [{ userId: "u1" }, { userId: "u2" }],
+      status: "live",
+    })
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.getByTestId("map-core")).toHaveAttribute("data-live-position-count", "2")
+  })
+
+  it("asks for consent, naming who receives the position, only when sharing is chosen", async () => {
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
+
+    expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
+  })
+
+  it("keeps watching, and shares nothing, when the consent dialog is cancelled", async () => {
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
+
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
+
+    expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching")
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
+  })
+
+  it("starts sharing the device's position once consent is given", async () => {
+    mockUsePositionWatch.mockReturnValue({ status: "acquiring", lastSentAt: null })
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
+
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
+
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, true)
     expect(screen.getByText("Acquiring location…")).toBeInTheDocument()
   })
 
-  it("shows the consent dialog naming who receives the position, and does not enter navigate mode until confirmed", async () => {
+  it("stops sharing but keeps watching when sharing is switched off, with no second dialog", async () => {
+    mockUsePositionWatch.mockReturnValue({ status: "sending", lastSentAt: new Date() })
     render(
       <MapBuilder
         itinerary={ITINERARY}
@@ -841,35 +937,16 @@ describe("MapBuilder — Navigate mode", () => {
         showNavigate={true}
       />,
     )
-
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
 
-    // The trigger is legitimately hidden from the accessibility tree while the modal
-    // is open (Radix suppresses background content for a screen reader), so the proof
-    // navigate mode hasn't started is its absence, not a pressed-state check on a
-    // button that can't be queried right now.
-    expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
-    expect(screen.queryByTestId("navigate-chrome")).not.toBeInTheDocument()
-  })
+    await userEvent.click(screen.getByRole("button", { name: /stop sharing/i }))
 
-  it("leaves navigate mode off when the consent dialog is cancelled", async () => {
-    render(
-      <MapBuilder
-        itinerary={ITINERARY}
-        tripId={TRIP_ID}
-        tripName="Cinque Terre"
-        showNavigate={true}
-      />,
-    )
-
-    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
-    await userEvent.click(screen.getByRole("button", { name: /cancel/i }))
-
-    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    )
     expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, false)
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching")
   })
 
   it("does not show the consent dialog again when turning navigate off", async () => {
@@ -884,6 +961,7 @@ describe("MapBuilder — Navigate mode", () => {
     )
 
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
     await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
 
@@ -894,6 +972,28 @@ describe("MapBuilder — Navigate mode", () => {
       "aria-pressed",
       "false",
     )
+  })
+
+  // Sharing was consented to for one Navigate session; it must not silently resume the next time.
+  it("does not resume sharing when Navigate is turned back on", async () => {
+    mockUsePositionWatch.mockReturnValue({ status: "sending", lastSentAt: new Date() })
+    render(
+      <MapBuilder
+        itinerary={ITINERARY}
+        tripId={TRIP_ID}
+        tripName="Cinque Terre"
+        showNavigate={true}
+      />,
+    )
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
+    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, false)
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching")
   })
 
   it("shows the sharing label with the live crew count once position sending starts", async () => {
@@ -911,6 +1011,7 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
     await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     // The chip drops "position" and "crew" on a phone, so the sentence is split
     // across `sr-only` spans rather than being one text node. Asserted on the
@@ -934,7 +1035,6 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
-    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     expect(screen.getByRole("button", { name: /close day/i })).toBeInTheDocument()
   })
 
@@ -949,7 +1049,6 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
-    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     expect(screen.queryByRole("button", { name: /close day/i })).not.toBeInTheDocument()
   })
 
@@ -965,6 +1064,7 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
     await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     expect(screen.getByText("Acquiring location…")).toBeInTheDocument()
 
@@ -972,6 +1072,7 @@ describe("MapBuilder — Navigate mode", () => {
 
     expect(screen.getByTestId("point-list-pane")).toBeInTheDocument() // back in edit mode
     expect(screen.queryByText("Acquiring location…")).not.toBeInTheDocument()
+    expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, false)
     expect(screen.queryByRole("button", { name: /close day/i })).not.toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute(
       "aria-pressed",
@@ -990,27 +1091,14 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
     await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
     expect(screen.getByText("Location denied")).toBeInTheDocument()
   })
 
-  it("opens the consent dialog (rather than entering navigate mode directly) from ?navigate=1", () => {
-    mockUseSearchParams.mockReturnValue(new URLSearchParams("navigate=1"))
-    render(
-      <MapBuilder
-        itinerary={ITINERARY}
-        tripId={TRIP_ID}
-        tripName="Cinque Terre"
-        showNavigate={true}
-      />,
-    )
-    // Trigger is hidden from the a11y tree while the modal is open — see the note in
-    // the button-click version of this assertion above.
-    expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
-    expect(screen.queryByTestId("navigate-chrome")).not.toBeInTheDocument()
-  })
-
-  it("enters navigate mode from ?navigate=1 once the deep-link-triggered dialog is confirmed", async () => {
+  // A link is exactly as much "I want to see the group" as a click, and no more: it watches,
+  // and sharing stays a separate choice made in the app.
+  it("enters navigate mode watching from ?navigate=1, with no dialog and nothing shared", () => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams("navigate=1"))
     render(
       <MapBuilder
@@ -1021,10 +1109,10 @@ describe("MapBuilder — Navigate mode", () => {
       />,
     )
 
-    await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
-
-    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
     expect(screen.queryByText(/share your live position/i)).not.toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Navigate" })).toHaveAttribute("aria-pressed", "true")
+    expect(screen.getByTestId("navigate-chrome")).toHaveTextContent("Watching")
+    expect(mockUsePositionWatch).not.toHaveBeenCalledWith(TRIP_ID, true)
   })
 
   it("ignores ?navigate=1 when the caller is not allowed to navigate", () => {
@@ -1136,11 +1224,19 @@ describe("MapBuilder — Navigate mode when inReach is the source (M29)", () => 
     )
 
     await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+    await userEvent.click(screen.getByRole("button", { name: /share my position/i }))
     expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
     await userEvent.click(screen.getByRole("button", { name: /start sharing/i }))
 
     expect(mockUsePositionWatch).toHaveBeenLastCalledWith(TRIP_ID, true)
     expect(screen.getByText("Acquiring location…")).toBeInTheDocument()
+  })
+
+  it("offers no sharing switch when inReach is the source", async () => {
+    renderWithInReach()
+    await userEvent.click(screen.getByRole("button", { name: "Navigate" }))
+
+    expect(screen.queryByRole("button", { name: /share my position/i })).not.toBeInTheDocument()
   })
 })
 

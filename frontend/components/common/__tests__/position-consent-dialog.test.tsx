@@ -30,7 +30,9 @@ describe("PositionConsentDialog", () => {
     expect(screen.getByText(/share your live position/i)).toBeInTheDocument()
     expect(screen.getByText(/other members of this trip/i)).toBeInTheDocument()
     expect(screen.getByText(/shore contact/i)).toBeInTheDocument()
-    expect(screen.getByText(/stops the moment you turn navigate off/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/stops the moment you stop sharing or turn navigate off/i),
+    ).toBeInTheDocument()
   })
 
   it("asks about the inReach position, names who receives it and says when it stops", () => {
