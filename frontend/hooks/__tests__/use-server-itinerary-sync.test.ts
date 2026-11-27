@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import { useServerItinerarySync } from "../use-server-itinerary-sync"
 import type { Itinerary } from "@/lib/dtos/itinerary"
+import { itinerarySignature } from "@/lib/itinerary/server-sync"
 
 function itineraryWith(pointName: string): Itinerary {
   return {
@@ -16,13 +17,25 @@ function itineraryWith(pointName: string): Itinerary {
   } as unknown as Itinerary
 }
 
-type HookProps = { itinerary: Itinerary; isEditing: boolean; isSaving: boolean }
+type HookProps = {
+  itinerary: Itinerary
+  isEditing: boolean
+  isSaving: boolean
+  // What the builder holds. Left out, it holds what it was seeded with.
+  localSignature?: string
+}
 
 function setup(initial: HookProps) {
   const apply = vi.fn()
   const discardLocalEdit = vi.fn()
   const view = renderHook(
-    (props: HookProps) => useServerItinerarySync({ ...props, apply, discardLocalEdit }),
+    ({ localSignature, ...props }: HookProps) =>
+      useServerItinerarySync({
+        ...props,
+        localSignature: localSignature ?? itinerarySignature(initial.itinerary),
+        apply,
+        discardLocalEdit,
+      }),
     { initialProps: initial },
   )
   return { apply, discardLocalEdit, ...view }
@@ -148,5 +161,60 @@ describe("useServerItinerarySync", () => {
 
     expect(result.current.serverMovedWhileEditing).toBe(false)
     expect(apply).not.toHaveBeenCalled()
+  })
+
+  it("does not report the user's own saved change as someone else's", () => {
+    // The user dropped a point and the save finished; the builder already shows it. The
+    // refresh the change log triggers brings the same route back.
+    const mine = itineraryWith("Cala Mondragó")
+    const { apply, rerender, result } = setup({
+      itinerary: itineraryWith("Cala"),
+      isEditing: true,
+      isSaving: false,
+    })
+
+    rerender({
+      itinerary: mine,
+      isEditing: true,
+      isSaving: false,
+      localSignature: itinerarySignature(mine),
+    })
+
+    expect(result.current.serverMovedWhileEditing).toBe(false)
+    expect(apply).not.toHaveBeenCalled()
+  })
+
+  it("still reports someone else's change after an echo of the user's own", () => {
+    const mine = itineraryWith("Cala Mondragó")
+    const { rerender, result } = setup({
+      itinerary: itineraryWith("Cala"),
+      isEditing: true,
+      isSaving: false,
+    })
+    const localSignature = itinerarySignature(mine)
+    rerender({ itinerary: mine, isEditing: true, isSaving: false, localSignature })
+
+    rerender({
+      itinerary: itineraryWith("Cala Blava"),
+      isEditing: true,
+      isSaving: false,
+      localSignature,
+    })
+
+    expect(result.current.serverMovedWhileEditing).toBe(true)
+  })
+
+  it("reports a change that returns the server to what it showed before the user's edit", () => {
+    // The server was "Cala", the user saved "Cala Mondragó", and someone else then put it
+    // back to "Cala": that differs from what the builder holds, so the user is told.
+    const original = itineraryWith("Cala")
+    const mine = itineraryWith("Cala Mondragó")
+    const localSignature = itinerarySignature(mine)
+    const { rerender, result } = setup({ itinerary: original, isEditing: true, isSaving: false })
+    rerender({ itinerary: mine, isEditing: true, isSaving: false, localSignature })
+
+    rerender({ itinerary: itineraryWith("Cala"), isEditing: true, isSaving: false, localSignature })
+
+    expect(result.current.serverMovedWhileEditing).toBe(true)
   })
 })
