@@ -2,8 +2,8 @@ import { ApiError, OFFLINE_ERROR_MESSAGE, SessionExpiredError, apiPost } from ".
 import { SEND_FAILURE, STOP_REASON, type PositionFix, type SendOutcome } from "./types"
 
 // One ping to `POST /live/trip/<id>/position`. Never throws: the caller is a background task with
-// nobody to show an error to, so every way it can go wrong becomes an outcome the task acts on and
-// the evidence log records. A failed send is not queued; the next fix retries (the queue is WP5).
+// nobody to show an error to, so every way it can go wrong becomes an outcome the task acts on. A
+// failed send is not queued; the next fix retries (the queue is WP5).
 export async function sendPositionPing(tripId: string, fix: PositionFix): Promise<SendOutcome> {
   try {
     await apiPost<unknown>(`/api/live/trip/${tripId}/position`, {
