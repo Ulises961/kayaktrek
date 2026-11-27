@@ -33,6 +33,7 @@ from Api.database import db
 from sqlalchemy.orm import selectinload
 from Services.user_service import UserService
 from Services.block_service import BlockService
+from Services.notification_service import NotificationService
 from Schemas.base_schema import camelcase
 
 logger = logging.getLogger(__name__)
@@ -597,6 +598,7 @@ class TripService:
             db.session.flush()  # obtain membership.id before seeding packing
             # Seed the new crew member's private packing list from their default kit.
             seed_member_packing(membership)
+            NotificationService.notify_trip_invitation_accepted(invitation.trip_id, invitation.user_id)
             logger.info(f"User {user_id} accepted invitation to trip {trip_id}")
         else:
             logger.info(f"User {user_id} declined invitation to trip {trip_id}")

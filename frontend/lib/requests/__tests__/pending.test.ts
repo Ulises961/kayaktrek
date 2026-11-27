@@ -1,49 +1,90 @@
 import { describe, it, expect } from "vitest"
-import { summarizePending, buildPendingRequestRows } from "../pending"
-import type { Trip } from "@/lib/dtos/trip"
-import type { Connection } from "@/lib/dtos/connection"
-import type { EndorsementRequest } from "@/lib/dtos/endorsement-request"
+import { NOTIFICATION_KIND } from "@/lib/dtos/pending-requests"
+import {
+  badgeTotal,
+  buildNotificationRows,
+  buildPendingRequestRows,
+  EMPTY_PENDING_SUMMARY,
+  listsPendingRequests,
+} from "../pending"
 
-const CURRENT_USER_ID = "01952f1a-0000-7000-8000-000000000001"
-const OTHER_USER_ID = "01952f1a-0000-7000-8000-000000000002"
+describe("badgeTotal", () => {
+  it("adds what is waiting on the user to the answers they have not seen", () => {
+    expect(
+      badgeTotal({
+        tripInvitations: 1,
+        buddyRequests: 2,
+        endorsementRequests: 3,
+        acceptedTripInvitations: 4,
+        acceptedBuddyRequests: 5,
+      }),
+    ).toBe(15)
+  })
 
-const invitation = (id: string): Trip => ({ id, destination: "Fjords" }) as Trip
+  it("is zero for an empty summary", () => {
+    expect(badgeTotal(EMPTY_PENDING_SUMMARY)).toBe(0)
+  })
+})
 
-const connection = (status: "pending" | "accepted", addresseeId: string): Connection =>
-  ({
-    id: `conn-${addresseeId}`,
-    status,
-    requester: { id: OTHER_USER_ID, username: "other", name: "Other" },
-    addressee: { id: addresseeId, username: "me", name: "Me" },
-  }) as Connection
-
-const endorsementRequest = (id: string): EndorsementRequest => ({ id }) as EndorsementRequest
-
-describe("summarizePending", () => {
-  it("counts trip invitations and endorsement requests directly", () => {
-    const result = summarizePending(
-      [invitation("t1"), invitation("t2")],
+describe("buildNotificationRows", () => {
+  it("has no rows when nothing has been answered", () => {
+    expect(buildNotificationRows({ acceptedTripInvitations: 0, acceptedBuddyRequests: 0 })).toEqual(
       [],
-      [endorsementRequest("e1")],
-      CURRENT_USER_ID,
     )
-    expect(result.tripInvitations).toBe(2)
-    expect(result.endorsementRequests).toBe(1)
   })
 
-  it("counts only connections where the current user is the addressee", () => {
-    const connections = [
-      connection("pending", CURRENT_USER_ID),
-      connection("pending", CURRENT_USER_ID),
-      connection("pending", OTHER_USER_ID), // outgoing — caller sent this one
-    ]
-    const result = summarizePending([], connections, [], CURRENT_USER_ID)
-    expect(result.buddyRequests).toBe(2)
+  it("says what was accepted, links to where it shows, and names the kind it clears", () => {
+    expect(buildNotificationRows({ acceptedTripInvitations: 2, acceptedBuddyRequests: 1 })).toEqual(
+      [
+        {
+          label: "2 trip invitations accepted",
+          href: "/trips",
+          clears: NOTIFICATION_KIND.TRIP_INVITATION_ACCEPTED,
+        },
+        {
+          label: "1 buddy request accepted",
+          href: "/paddlers",
+          clears: NOTIFICATION_KIND.BUDDY_REQUEST_ACCEPTED,
+        },
+      ],
+    )
   })
 
-  it("returns all zeros for empty inputs", () => {
-    const result = summarizePending([], [], [], CURRENT_USER_ID)
-    expect(result).toEqual({ tripInvitations: 0, buddyRequests: 0, endorsementRequests: 0 })
+  it("singularises a count of exactly one", () => {
+    const [row] = buildNotificationRows({ acceptedTripInvitations: 1, acceptedBuddyRequests: 0 })
+
+    expect(row.label).toBe("1 trip invitation accepted")
+  })
+})
+
+describe("listsPendingRequests", () => {
+  it.each(["/dashboard", "/invitations", "/paddlers", "/logs"])(
+    "is true for %s, where the requests are listed",
+    (path) => {
+      expect(listsPendingRequests(path)).toBe(true)
+    },
+  )
+
+  // A trip's Crew tab lists its pending invitations, which is exactly what an acceptance removes.
+  it("is true for a trip's crew page, where its pending invitations are listed", () => {
+    expect(listsPendingRequests("/trips/01952f1a-0000-7000-8000-000000000001/crew")).toBe(true)
+    expect(listsPendingRequests("/trips/abc/crew/")).toBe(true)
+  })
+
+  it("is false for the trip's other tabs, which list no invitations", () => {
+    expect(listsPendingRequests("/trips/abc/items")).toBe(false)
+    expect(listsPendingRequests("/trips/abc/logistics")).toBe(false)
+    expect(listsPendingRequests("/trips/abc")).toBe(false)
+  })
+
+  it("is false for a page that lists none, including one that only shares a prefix", () => {
+    expect(listsPendingRequests("/trips/abc")).toBe(false)
+    expect(listsPendingRequests("/paddlers-hub")).toBe(false)
+    expect(listsPendingRequests(null)).toBe(false)
+  })
+
+  it("is true below a listing page too", () => {
+    expect(listsPendingRequests("/logs/abc")).toBe(true)
   })
 })
 
