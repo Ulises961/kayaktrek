@@ -9,7 +9,6 @@ import { WATCHDOG_TASK } from "../watchdog-schedule"
 jest.mock("expo-task-manager", () => ({ defineTask: jest.fn() }))
 jest.mock("expo-background-task", () => ({ BackgroundTaskResult: { Success: 1, Failed: 2 } }))
 jest.mock("expo-location", () => ({}))
-jest.mock("../../../spike/events", () => ({ logEvent: jest.fn() }))
 jest.mock("../position-engine", () => ({
   POSITION_TASK: "kayaktrek-position",
   ensureRunning: jest.fn().mockResolvedValue(undefined),

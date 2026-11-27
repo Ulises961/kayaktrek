@@ -1,7 +1,6 @@
 import * as BackgroundTask from "expo-background-task"
 import * as Location from "expo-location"
 
-import type { SpikeEvent } from "../../../spike/run-report"
 import {
   POSITION_TASK,
   SharingStartError,
@@ -74,7 +73,6 @@ function location_(f: PositionFix): Location.LocationObject {
 }
 
 let clock: number
-let events: SpikeEvent[]
 let send: jest.Mock
 let deps: EngineDeps
 
@@ -96,9 +94,8 @@ beforeEach(() => {
   setSharingRecord(null)
   resetEngineForTests()
   clock = T0
-  events = []
   send = jest.fn().mockResolvedValue({ kind: "sent" })
-  deps = { now: () => clock, send, log: (event) => events.push(event) }
+  deps = { now: () => clock, send }
   location.requestForegroundPermissionsAsync.mockResolvedValue({ status: "granted" } as never)
   location.hasServicesEnabledAsync.mockResolvedValue(true)
   location.hasStartedLocationUpdatesAsync.mockResolvedValue(true)
@@ -106,23 +103,12 @@ beforeEach(() => {
   location.stopLocationUpdatesAsync.mockResolvedValue(undefined)
 })
 
-const eventsOf = <K extends SpikeEvent["ev"]>(kind: K) =>
-  events.filter((event): event is Extract<SpikeEvent, { ev: K }> => event.ev === kind)
-
 describe("handleFixes", () => {
-  it("writes every fix to the evidence log, whether or not it is sent", async () => {
-    startRecord()
-    await handleFixes([location_(fix()), location_(fix({ timestamp: T0 + 1_000 }))], deps)
-    expect(eventsOf("fix")).toHaveLength(2)
-    expect(eventsOf("fix")[0]).toMatchObject({ lat: 46.0, lon: 11.0, accuracyM: 10, speedMs: 0 })
-  })
-
   it("sends the first fix and records when it went out", async () => {
     startRecord()
     await handleFixes([location_(fix())], deps)
     expect(send).toHaveBeenCalledWith("trip-1", expect.objectContaining({ lat: 46.0, lon: 11.0 }))
     expect(getSharingRecord()).toMatchObject({ lastSentAt: T0, lastFixAt: T0, lastFailure: null })
-    expect(eventsOf("ping")).toEqual([{ ev: "ping", t: T0, source: "movement", outcome: "sent", detail: null }])
   })
 
   it("holds back a fix inside the throttle window and one that has not moved", async () => {
@@ -148,7 +134,6 @@ describe("handleFixes", () => {
     send.mockResolvedValueOnce({ kind: "retry", reason: SEND_FAILURE.OFFLINE })
     await handleFixes([location_(fix())], deps)
     expect(getSharingRecord()).toMatchObject({ lastSentAt: null, lastFailure: { at: T0, reason: SEND_FAILURE.OFFLINE } })
-    expect(eventsOf("ping")[0]).toMatchObject({ outcome: "retry", detail: SEND_FAILURE.OFFLINE })
     clock = T0 + 1_000
     await handleFixes([location_(fix({ timestamp: T0 + 1_000 }))], deps)
     expect(send).toHaveBeenCalledTimes(2)
@@ -162,22 +147,12 @@ describe("handleFixes", () => {
     expect(location.stopLocationUpdatesAsync).toHaveBeenCalledWith(POSITION_TASK)
     expect(backgroundTask.unregisterTaskAsync).toHaveBeenCalledWith(WATCHDOG_TASK)
     expect(getSharingRecord()).toMatchObject({ endedReason: STOP_REASON.TRIP_NOT_LIVE })
-    expect(eventsOf("run-stop")[0]).toMatchObject({ reason: STOP_REASON.TRIP_NOT_LIVE })
-  })
-
-  it("sends nothing in a practice share, but counts the ping as sent so the keep-alive logic runs", async () => {
-    startRecord({ target: { kind: "practice" } })
-    await handleFixes([location_(fix())], deps)
-    expect(send).not.toHaveBeenCalled()
-    expect(getSharingRecord()).toMatchObject({ lastSentAt: T0 })
-    expect(eventsOf("ping")[0]).toMatchObject({ outcome: "practice" })
   })
 
   it("stops a task that is registered with nothing to share", async () => {
     await handleFixes([location_(fix())], deps)
     expect(send).not.toHaveBeenCalled()
     expect(location.stopLocationUpdatesAsync).toHaveBeenCalledWith(POSITION_TASK)
-    expect(eventsOf("error")[0].message).toMatch(/no sharing record/)
   })
 
   it("maps Android's -1 for a missing speed or heading to null", async () => {
@@ -189,14 +164,15 @@ describe("handleFixes", () => {
 
 describe("deliver", () => {
   it("does nothing when there is no share to deliver to", async () => {
-    expect(await deliver(fix(), "keep-alive", deps)).toBeNull()
+    expect(await deliver(fix(), deps)).toBeNull()
     expect(send).not.toHaveBeenCalled()
   })
 
-  it("marks a keep-alive ping in the evidence log", async () => {
+  it("sends a fix the throttle never saw, such as the keep-alive's, and records when it went out", async () => {
     startRecord()
-    await deliver(fix(), "keep-alive", deps)
-    expect(eventsOf("ping")[0]).toMatchObject({ source: "keep-alive", outcome: "sent" })
+    expect(await deliver(fix(), deps)).toEqual({ kind: "sent" })
+    expect(send).toHaveBeenCalledWith("trip-1", expect.objectContaining({ lat: 46.0, lon: 11.0 }))
+    expect(getSharingRecord()).toMatchObject({ lastSentAt: T0 })
   })
 })
 
@@ -231,12 +207,6 @@ describe("startSharing", () => {
     )
     expect(backgroundTask.registerTaskAsync).toHaveBeenCalledWith(WATCHDOG_TASK, { minimumInterval: 60 })
     expect(getSharingRecord()).toMatchObject({ target: { kind: "trip", tripId: "trip-1" }, startedAt: T0, endedReason: null })
-    expect(eventsOf("run-start")[0].label).toMatch(/trip/i)
-  })
-
-  it("labels a practice share so the report tells it from a real one", async () => {
-    await startSharing({ kind: "practice" }, deps)
-    expect(eventsOf("run-start")[0].label).toMatch(/practice/i)
   })
 
   it("clears the share and rethrows when the service will not start", async () => {
@@ -245,81 +215,96 @@ describe("startSharing", () => {
       reason: "start-failed",
     })
     expect(getSharingRecord()).toBeNull()
-    expect(eventsOf("error")[0].message).toMatch(/no foreground service/)
   })
 })
 
 describe("stopSharing", () => {
   it("clears the record when the paddler stops", async () => {
     startRecord()
-    await stopSharing(STOP_REASON.USER, deps)
+    await stopSharing(STOP_REASON.USER)
     expect(getSharingRecord()).toBeNull()
     expect(location.stopLocationUpdatesAsync).toHaveBeenCalledWith(POSITION_TASK)
     expect(backgroundTask.unregisterTaskAsync).toHaveBeenCalledWith(WATCHDOG_TASK)
-    expect(eventsOf("run-stop")[0]).toMatchObject({ reason: STOP_REASON.USER })
   })
 
   it("does not try to stop a service that is not running", async () => {
     startRecord()
     location.hasStartedLocationUpdatesAsync.mockResolvedValue(false)
-    await stopSharing(STOP_REASON.USER, deps)
+    await stopSharing(STOP_REASON.USER)
     expect(location.stopLocationUpdatesAsync).not.toHaveBeenCalled()
   })
 })
 
 describe("ensureRunning", () => {
   it("does nothing when there is no share, or it already ended", async () => {
-    await ensureRunning("launch", deps)
+    await ensureRunning("launch")
     startRecord({ endedReason: STOP_REASON.TRIP_NOT_LIVE })
-    await ensureRunning("launch", deps)
+    await ensureRunning("launch")
     expect(location.hasServicesEnabledAsync).not.toHaveBeenCalled()
   })
 
   it("leaves a healthy, registered task alone", async () => {
     startRecord()
-    await ensureRunning("foreground", deps)
+    await ensureRunning("foreground")
     expect(location.startLocationUpdatesAsync).not.toHaveBeenCalled()
-    expect(eventsOf("reregister")).toHaveLength(0)
+    expect(location.stopLocationUpdatesAsync).not.toHaveBeenCalled()
   })
 
   it("registers the task again when it has gone missing, for instance after the process was killed", async () => {
     startRecord()
     location.hasStartedLocationUpdatesAsync.mockResolvedValue(false)
-    await ensureRunning("launch", deps)
+    await ensureRunning("launch")
     expect(location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1)
-    expect(eventsOf("reregister")[0].reason).toBe("task-missing")
+    expect(location.stopLocationUpdatesAsync).not.toHaveBeenCalled()
   })
 
-  it("does not register while the system switch is off, and records that it is", async () => {
+  it("does not register while the system switch is off", async () => {
     startRecord()
     location.hasServicesEnabledAsync.mockResolvedValue(false)
     location.hasStartedLocationUpdatesAsync.mockResolvedValue(false)
-    await ensureRunning("foreground", deps)
+    await ensureRunning("foreground")
     expect(location.startLocationUpdatesAsync).not.toHaveBeenCalled()
-    expect(eventsOf("locsw")).toEqual([{ ev: "locsw", t: T0, on: false, source: "js" }])
   })
 
   it("re-registers when the switch comes back on, because a task started while it was off delivers nothing", async () => {
     startRecord()
     location.hasServicesEnabledAsync.mockResolvedValue(false)
-    await ensureRunning("foreground", deps)
+    await ensureRunning("foreground")
     location.hasServicesEnabledAsync.mockResolvedValue(true)
-    await ensureRunning("foreground", deps)
+    await ensureRunning("foreground")
     expect(location.stopLocationUpdatesAsync).toHaveBeenCalledWith(POSITION_TASK)
     expect(location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1)
-    expect(eventsOf("locsw").map((event) => event.on)).toEqual([false, true])
-    expect(eventsOf("reregister")[0].reason).toBe("switch-back-on")
+  })
+
+  it("re-registers only once after the switch comes back, not on every later check", async () => {
+    startRecord()
+    location.hasServicesEnabledAsync.mockResolvedValue(false)
+    await ensureRunning("foreground")
+    location.hasServicesEnabledAsync.mockResolvedValue(true)
+    await ensureRunning("foreground")
+    await ensureRunning("foreground")
+    expect(location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1)
   })
 
   it("re-registers on a watchdog wake when no fix has arrived since the previous wake", async () => {
     startRecord({ lastFixAt: T0 - 7_200_000, lastWakeAt: T0 - 3_600_000 })
-    await ensureRunning("watchdog", deps)
-    expect(eventsOf("reregister")[0].reason).toBe("no-fix-since-last-wake")
+    await ensureRunning("watchdog")
+    expect(location.stopLocationUpdatesAsync).toHaveBeenCalledWith(POSITION_TASK)
+    expect(location.startLocationUpdatesAsync).toHaveBeenCalledTimes(1)
   })
 
   it("does not re-register on a watchdog wake when fixes are arriving", async () => {
     startRecord({ lastFixAt: T0 - 60_000, lastWakeAt: T0 - 3_600_000 })
-    await ensureRunning("watchdog", deps)
-    expect(eventsOf("reregister")).toHaveLength(0)
+    await ensureRunning("watchdog")
+    expect(location.startLocationUpdatesAsync).not.toHaveBeenCalled()
+  })
+
+  it("keeps a failed re-registration from throwing, so the next check can try again", async () => {
+    startRecord()
+    location.hasStartedLocationUpdatesAsync.mockResolvedValue(false)
+    location.startLocationUpdatesAsync.mockRejectedValueOnce(new Error("no foreground service"))
+    await expect(ensureRunning("launch")).resolves.toBeUndefined()
+    await ensureRunning("launch")
+    expect(location.startLocationUpdatesAsync).toHaveBeenCalledTimes(2)
   })
 })
