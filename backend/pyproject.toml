@@ -27,7 +27,7 @@ dependencies = [
     "uuid_extension",
     "camel-converter",
     "flask-limiter",
-    "redis>=8.1.0",
+    "redis>=8.2.0",
     "flask-mail",
     "gunicorn",
     "boto3",
@@ -44,7 +44,7 @@ dependencies = [
     "logfire[celery,flask,requests,sqlalchemy]>=5.6.0",
     "apispec>=6.10.1",
     "apispec-webframeworks>=1.2.0",
-    "flask-swagger-ui>=5.35.0",
+    "flask-swagger-ui>=5.36.0",
 ]
 
 [dependency-groups]
