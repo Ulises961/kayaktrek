@@ -107,6 +107,71 @@ describe("PaddlersHub", () => {
     await waitFor(() => expect(screen.getByText("Cara")).toBeInTheDocument())
   })
 
+  // The search ran while the request was still pending. The other side then accepted, and the page
+  // re-rendered with the accepted connection. The result is search state the refresh does not
+  // re-fetch, so it must follow the connections rather than keep saying "Pending".
+  describe("a search result whose connection changes after the search ran", () => {
+    const ND1_ID = "01952f1a-0000-7000-8000-0000000000aa"
+    const ND1 = { id: ND1_ID, username: "nd1", name: "ND1", surname: null, avatarUrl: null }
+    const connectionWith = (status: "pending" | "accepted"): Connection => ({
+      id: "01952f1a-0000-7000-8000-0000000000c2",
+      status,
+      created: null,
+      respondedAt: null,
+      requester: SELF,
+      addressee: ND1,
+    })
+    const foundWhilePending = searchResult({
+      id: ND1_ID,
+      username: "nd1",
+      name: "ND1",
+      relationship: "pending_outgoing",
+      connectionId: "01952f1a-0000-7000-8000-0000000000c2",
+    })
+
+    async function searchForNd1(connections: Connection[]) {
+      mockSearch.mockResolvedValue(searchPage([foundWhilePending]))
+      const view = render(<PaddlersHub connections={connections} blocks={[]} currentUserId={ME} />)
+      await userEvent.type(screen.getByLabelText(/search paddlers/i), "nd")
+      await waitFor(() => expect(screen.getByRole("button", { name: /pending/i })).toBeVisible())
+      return view
+    }
+
+    it("stops saying Pending once the connection is accepted", async () => {
+      const view = await searchForNd1([connectionWith("pending")])
+
+      view.rerender(
+        <PaddlersHub connections={[connectionWith("accepted")]} blocks={[]} currentUserId={ME} />,
+      )
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /already buddies/i })).toBeInTheDocument(),
+      )
+      expect(screen.queryByRole("button", { name: /^pending$/i })).not.toBeInTheDocument()
+    })
+
+    it("offers Add buddy again if the request is gone", async () => {
+      const view = await searchForNd1([connectionWith("pending")])
+
+      view.rerender(<PaddlersHub connections={[]} blocks={[]} currentUserId={ME} />)
+
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: /add buddy/i })).toBeInTheDocument(),
+      )
+    })
+
+    it("does not re-run the search, since the connections already say what changed", async () => {
+      const view = await searchForNd1([connectionWith("pending")])
+      mockSearch.mockClear()
+
+      view.rerender(
+        <PaddlersHub connections={[connectionWith("accepted")]} blocks={[]} currentUserId={ME} />,
+      )
+
+      expect(mockSearch).not.toHaveBeenCalled()
+    })
+  })
+
   it("does not show the community section when the search field is empty", () => {
     render(<PaddlersHub connections={CONNECTIONS} blocks={[]} currentUserId={ME} />)
     expect(screen.queryByText(/search the community/i)).not.toBeInTheDocument()
